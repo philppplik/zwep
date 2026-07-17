@@ -1,6 +1,6 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
-import { loadEnv, loadSources, getSource, upsertSource, deleteSource, sourceSchema } from '@zwep/config';
+import { loadEnv, isGoogleProxyEnabled, loadSources, getSource, upsertSource, deleteSource, sourceSchema } from '@zwep/config';
 import { Indexer } from '@zwep/indexer';
 import { crawlSource, type CrawlSummary } from '@zwep/worker/crawl-lib.ts';
 import type { SearchSort, SourceConfig } from '@zwep/shared';
@@ -106,6 +106,11 @@ export async function build() {
     return true;
   };
 
+  // admin config (feature flags)
+  app.get('/v1/admin/config', { preHandler: requireAdmin }, async () => {
+    return { googleProxyEnabled: isGoogleProxyEnabled() };
+  });
+
   // list sources
   app.get('/v1/admin/sources', { preHandler: requireAdmin }, async () => {
     return { sources: loadSources() };
@@ -124,8 +129,19 @@ export async function build() {
     if (!parsed.success) {
       return reply.code(400).send({ error: { code: 'invalid', message: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; '), status: 400 } });
     }
-    const src = upsertSource(parsed.data as SourceConfig);
-    return { ok: true, source: src };
+    const src = parsed.data as SourceConfig;
+    // Privacy gate: Google proxy is opt-in. Reject unless enabled in env.
+    if (src.type === 'google' && !isGoogleProxyEnabled()) {
+      return reply.code(403).send({
+        error: {
+          code: 'google_proxy_disabled',
+          message: 'Google proxy is disabled. Set GOOGLE_PROXY_ENABLED=true to allow Google-type sources.',
+          status: 403,
+        },
+      });
+    }
+    const saved = upsertSource(src);
+    return { ok: true, source: saved };
   });
 
   // delete source

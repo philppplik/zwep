@@ -107,3 +107,11 @@ export async function adminCrawlStatus(adminKey: string, taskId: string): Promis
   const r = await getJson<{ task: CrawlTask }>(`${BASE}/admin/crawl/${encodeURIComponent(taskId)}?admin_key=${encodeURIComponent(adminKey)}`);
   return r.task;
 }
+
+export interface AdminConfig {
+  googleProxyEnabled: boolean;
+}
+export async function adminConfig(adminKey: string): Promise<AdminConfig> {
+  const r = await getJson<AdminConfig>(`${BASE}/admin/config?admin_key=${encodeURIComponent(adminKey)}`);
+  return r;
+}

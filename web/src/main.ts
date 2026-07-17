@@ -15,40 +15,27 @@ function applyTheme(theme: 'light' | 'dark') {
 const saved = (localStorage.getItem(THEME_KEY) as 'light' | 'dark' | null) ?? 'light';
 applyTheme(saved);
 
-// ---------- Header ----------
-const header = document.createElement('header');
-header.className = 'z-header';
-header.innerHTML = `
-  <div class="z-header__brand">
-    <span class="z-header__mark">Z</span>
-    <span>Zwep</span>
-  </div>
-  <div class="z-header__actions">
-    <a class="z-header__link" id="nav-admin" href="/admin">Admin</a>
-    <button class="z-icon-btn" id="theme-toggle" aria-label="Toggle theme">
-      <span id="theme-icon"></span>
-    </button>
-  </div>
-`;
-root.appendChild(header);
-
-const themeToggle = header.querySelector('#theme-toggle') as HTMLButtonElement;
-const themeIcon = header.querySelector('#theme-icon') as HTMLSpanElement;
-function paintIcon() {
+function paintIcon(btn: HTMLButtonElement) {
   const dark = document.documentElement.getAttribute('data-theme') === 'dark';
-  themeIcon.textContent = dark ? '☀' : '☾';
+  btn.textContent = dark ? '☀' : '☾';
 }
-paintIcon();
-themeToggle.addEventListener('click', () => {
-  const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-  applyTheme(next);
-  paintIcon();
-});
 
 // ---------- Main ----------
 const main = document.createElement('main');
 main.className = 'z-main';
 root.appendChild(main);
+
+// ---------- Footer ----------
+const footer = document.createElement('footer');
+footer.className = 'z-footer';
+footer.innerHTML = `
+  <span class="z-footer__tag">A small, self-hosted search engine. Search what you curate.</span>
+  <nav class="z-footer__nav">
+    <a class="z-footer__link" id="nav-admin" href="/admin">Admin</a>
+    <a class="z-footer__link" id="nav-settings" href="/settings">Settings</a>
+  </nav>
+`;
+root.appendChild(footer);
 
 // ---------- Result list (always present, below) ----------
 const results = new ResultList();
@@ -60,9 +47,9 @@ const state = { q: '', offset: 0, loading: false };
 function renderHome() {
   main.className = 'z-main';
   main.innerHTML = `
-    <div class="z-home">
-      <h1 class="z-home__title">Zwep</h1>
-      <p class="z-home__subtitle">A small, self-hosted search engine. Search what you curate.</p>
+    <div class="z-hero">
+      <img class="z-hero__logo" src="/zwep-logo.png" alt="Zwep" />
+      <h1 class="z-hero__title">Zwep</h1>
     </div>
   `;
   main.appendChild(searchBar.el);
@@ -100,7 +87,49 @@ async function doSearch() {
 }
 
 // ---------- Boot / routing ----------
+function clearOverlay() {
+  root.querySelectorAll('.z-overlay-page').forEach((n) => n.remove());
+  main.style.display = '';
+  results.el.style.display = '';
+}
+
+function renderSettings() {
+  clearOverlay();
+  main.style.display = 'none';
+  results.el.style.display = 'none';
+  const wrap = document.createElement('div');
+  wrap.className = 'z-overlay-page z-settings';
+  const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+  wrap.innerHTML = `
+    <div class="z-settings__card">
+      <h2>Settings</h2>
+      <div class="z-field">
+        <span>Appearance</span>
+        <button class="z-btn" id="set-theme">Switch to ${dark ? 'light' : 'dark'}</button>
+      </div>
+      <p class="z-hint">Theme is stored in your browser (localStorage).</p>
+      <div class="z-field">
+        <span>Sources</span>
+        <a class="z-btn z-btn--primary" href="/admin">Manage sources →</a>
+      </div>
+      <a class="z-footer__link" href="/" id="set-back">← Back to search</a>
+    </div>`;
+  root.appendChild(wrap);
+  wrap.querySelector('#set-theme')!.addEventListener('click', () => {
+    const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    applyTheme(next);
+    renderSettings();
+  });
+  wrap.querySelector('#set-back')!.addEventListener('click', (e) => {
+    e.preventDefault();
+    history.pushState({}, '', '/');
+    route();
+  });
+}
+
 function route() {
+  // tear down any overlay page
+  root.querySelectorAll('.z-overlay-page').forEach((n) => n.remove());
   const path = location.pathname;
   if (path.startsWith('/admin')) {
     const admin = new AdminView();
@@ -108,8 +137,11 @@ function route() {
     main.style.display = 'none';
     root.appendChild(admin.el);
     admin.mount().catch(() => {});
-    // clean up on navigation away
     window.addEventListener('popstate', () => admin.unmount(), { once: true });
+    return;
+  }
+  if (path.startsWith('/settings')) {
+    renderSettings();
     return;
   }
   main.style.display = '';
@@ -125,17 +157,22 @@ function route() {
 
 route();
 
-// intercept Admin link to use SPA-style nav (no full reload)
-header.querySelector('#nav-admin')!.addEventListener('click', (e) => {
+// SPA-style nav for footer links
+footer.querySelector('#nav-admin')!.addEventListener('click', (e) => {
   e.preventDefault();
   history.pushState({}, '', '/admin');
   route();
 });
+footer.querySelector('#nav-settings')!.addEventListener('click', (e) => {
+  e.preventDefault();
+  history.pushState({}, '', '/settings');
+  route();
+});
 
-// show indexed count in subtitle after stats resolves
+// show indexed count in footer tag after stats resolves
 stats()
   .then((s) => {
-    const sub = main.querySelector('.z-home__subtitle');
-    if (sub && s.ok) sub.textContent = `${s.indexed} documents indexed. Search what you curate.`;
+    const tag = footer.querySelector('.z-footer__tag');
+    if (tag && s.ok) tag.textContent = `${s.indexed} documents indexed. Search what you curate.`;
   })
   .catch(() => {});

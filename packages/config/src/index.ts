@@ -7,6 +7,9 @@ import type { SourceConfig } from '@zwep/shared';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
+const rawGoogle = process.env.ZWEP_GOOGLE_PROXY_ENABLED;
+const googleEnabled = rawGoogle === 'true' || rawGoogle === true;
+
 export const envSchema = z.object({
   MEILI_HOST: z.string().default('http://127.0.0.1:7700'),
   MEILI_MASTER_KEY: z.string().default('zwep_dev_master_key_change_me'),
@@ -19,13 +22,25 @@ export const envSchema = z.object({
   CRAWLER_USER_AGENT: z.string().default('ZwepBot/1.0 (+https://zwep.example)'),
   CRAWLER_CONCURRENCY: z.coerce.number().default(4),
   CRAWLER_DELAY_MS: z.coerce.number().default(500),
+  GOOGLE_PROXY_ENABLED: z.boolean().default(googleEnabled),
 });
 
 export type Env = z.infer<typeof envSchema>;
 
+/** Google proxy opt-in flag (privacy default: off). */
+export function isGoogleProxyEnabled(): boolean {
+  return !!loadEnv().GOOGLE_PROXY_ENABLED;
+}
+
 let cached: Env | null = null;
 export function loadEnv(): Env {
   if (cached) return cached;
+  cached = envSchema.parse(process.env);
+  return cached;
+}
+
+/** Re-parse env (e.g. after tests mutate process.env). */
+export function reloadEnv(): Env {
   cached = envSchema.parse(process.env);
   return cached;
 }

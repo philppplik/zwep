@@ -1,38 +1,89 @@
 /* Zwep Web — app layout + components (OpenAI-inspired) */
 
-/* ---------- Header ---------- */
+/* ---------- Header (removed: nav moved to footer) ---------- */
 .z-header {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  height: var(--z-header-h);
+  display: none;
+}
+.z-header__brand,
+.z-header__logo,
+.z-header__mark,
+.z-header__link,
+.z-header__actions {
+  display: none;
+}
+
+/* ---------- Hero (logo + title above search) ---------- */
+.z-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--z-space-3);
+  margin-bottom: var(--z-space-8);
+}
+.z-hero__logo {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+}
+.z-hero__title {
+  font-size: calc(var(--z-text-3xl) * 2);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin: 0;
+}
+
+/* ---------- Footer ---------- */
+.z-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 var(--z-space-5);
-  background: color-mix(in srgb, var(--z-bg) 85%, transparent);
+  gap: var(--z-space-4);
+  padding: var(--z-space-3) var(--z-space-5);
+  border-top: 1px solid var(--z-border);
+  background: color-mix(in srgb, var(--z-bg) 90%, transparent);
   backdrop-filter: saturate(180%) blur(12px);
-  border-bottom: 1px solid var(--z-border);
+  font-size: var(--z-text-xs);
 }
-.z-header__brand {
+.z-footer__tag {
+  color: var(--z-text-secondary);
+}
+.z-footer__nav {
   display: flex;
-  align-items: center;
-  gap: var(--z-space-2);
-  font-weight: 600;
-  font-size: var(--z-text-lg);
-  letter-spacing: -0.01em;
-  color: var(--z-text);
+  gap: var(--z-space-4);
 }
-.z-header__mark {
-  width: 22px;
-  height: 22px;
-  border-radius: var(--z-radius-sm);
-  background: var(--z-accent);
-  display: grid;
-  place-items: center;
-  color: #fff;
-  font-weight: 700;
-  font-size: var(--z-text-sm);
+.z-footer__link {
+  color: var(--z-text-secondary);
+  text-decoration: none;
+  font-weight: 600;
+}
+.z-footer__link:hover {
+  color: var(--z-accent);
+  text-decoration: none;
+}
+
+/* ---------- Settings overlay ---------- */
+.z-settings {
+  max-width: 520px;
+  margin: var(--z-space-16) auto;
+  padding: 0 var(--z-space-4);
+}
+.z-settings__card {
+  background: var(--z-surface);
+  border: 1px solid var(--z-border);
+  border-radius: var(--z-radius-lg);
+  padding: var(--z-space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--z-space-4);
+}
+.z-settings__card h2 {
+  margin: 0;
+  font-size: var(--z-text-xl);
+}
 }
 .z-header__actions {
   display: flex;
@@ -343,6 +394,32 @@
   font-weight: 600;
   letter-spacing: -0.01em;
   margin: 0;
+}
+.z-banner {
+  margin: var(--z-space-4) 0;
+  padding: var(--z-space-3) var(--z-space-4);
+  border-radius: var(--z-radius-md);
+  font-size: var(--z-text-sm);
+  border: 1px solid var(--z-border);
+}
+.z-banner--ok {
+  background: var(--z-accent-soft);
+  border-color: rgba(255, 102, 0, 0.25);
+  color: var(--z-text);
+}
+.z-banner--warn {
+  background: rgba(220, 38, 38, 0.08);
+  border-color: rgba(220, 38, 38, 0.3);
+  color: var(--z-text);
+}
+.z-hint {
+  font-size: var(--z-text-xs);
+  color: var(--z-text-secondary);
+  margin: var(--z-space-2) 0 0;
+  line-height: var(--z-leading-normal);
+}
+.z-hint--warn {
+  color: #b91c1c;
 }
 .z-table {
   width: 100%;

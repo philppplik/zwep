@@ -70,29 +70,16 @@ async function main() {
   r = await fetch(`${BASE}/v1/admin/sources/test?admin_key=${KEY}`, { method: 'DELETE' });
   check('delete source', r.ok);
 
-  // google source: create + crawl (graceful when Google blocks)
+  // google proxy disabled by default → creating google source must be rejected
   r = await fetch(`${BASE}/v1/admin/sources?admin_key=${KEY}`, {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ name: 'google', type: 'google', queries: ['test query'], allowedDomains: [], maxPages: 5 }),
+    body: JSON.stringify({ name: 'google', type: 'google', queries: ['x'], allowedDomains: [], maxPages: 5 }),
   });
-  check('create google source', r.ok);
-  r = await fetch(`${BASE}/v1/admin/crawl?admin_key=${KEY}`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ source: 'google', maxPages: 5 }),
-  });
-  const gcrawl = await r.json();
-  check('google crawl triggered', r.status === 202 && !!gcrawl.taskId);
-  let gtask: any = {};
-  for (let i = 0; i < 15 && gtask.status !== 'done' && gtask.status !== 'error'; i++) {
-    await new Promise((res) => setTimeout(res, 1000));
-    r = await fetch(`${BASE}/v1/admin/crawl/${gcrawl.taskId}?admin_key=${KEY}`);
-    const body = await r.json();
-    gtask = body.task ?? gtask;
-  }
-  check('google crawl finished gracefully', gtask.status === 'done', `indexed=${gtask.summary?.indexed} (0 expected if Google blocks)`);
-  await fetch(`${BASE}/v1/admin/sources/google?admin_key=${KEY}`, { method: 'DELETE' });
+  check('google source blocked when proxy disabled', r.status === 403, `status=${r.status}`);
+  r = await fetch(`${BASE}/v1/admin/config?admin_key=${KEY}`);
+  const conf = await r.json();
+  check('admin config reports googleProxyEnabled=false', conf.googleProxyEnabled === false);
 
   await app.close();
   console.log(results.join('\n'));

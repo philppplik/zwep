@@ -5,7 +5,9 @@ import {
   adminDeleteSource,
   adminCrawl,
   adminCrawlStatus,
+  adminConfig,
   type CrawlTask,
+  type AdminConfig,
 } from './client.ts';
 
 const ADMIN_KEY = localStorage.getItem('zwep-admin-key') || 'zwep_admin_dev_key';
@@ -34,7 +36,14 @@ export class AdminView {
     if (this.pollTimer) clearInterval(this.pollTimer);
   }
 
+  private config: AdminConfig | undefined;
+
   private async load() {
+    try {
+      this.config = await adminConfig(ADMIN_KEY);
+    } catch {
+      this.config = undefined;
+    }
     try {
       this.sources = await adminListSources(ADMIN_KEY);
     } catch (e) {
@@ -46,6 +55,10 @@ export class AdminView {
   }
 
   private renderShell() {
+    const gp = this.config?.googleProxyEnabled;
+    const gpBanner = gp
+      ? `<div class="z-banner z-banner--warn">⚠ Google proxy is <strong>enabled</strong> — queries are sent to Google when you crawl google-type sources.</div>`
+      : `<div class="z-banner z-banner--ok">✓ Google proxy is <strong>disabled</strong> (privacy default). Google-type sources are rejected until you set GOOGLE_PROXY_ENABLED=true.</div>`;
     this.el.innerHTML = `
       <div class="z-admin__head">
         <h2 class="z-admin__title">Sources</h2>
@@ -53,6 +66,7 @@ export class AdminView {
           <button class="z-btn z-btn--primary" id="add-source">+ New source</button>
         </div>
       </div>
+      ${gpBanner}
       <div class="z-admin__body"></div>
       <div class="z-admin__toast" id="admin-toast" hidden></div>
     `;
@@ -152,14 +166,27 @@ export class AdminView {
 
   private openEditor(src: SourceConfig | null) {
     const isNew = !src;
-    const s: SourceConfig = src ?? { name: '', seeds: [''], allowedDomains: [''], maxPages: 50 };
+    const s: SourceConfig = src ?? { name: '', type: 'web', seeds: [''], allowedDomains: [''], maxPages: 50 };
+    const isGoogle = s.type === 'google';
     const overlay = document.createElement('div');
     overlay.className = 'z-modal__overlay';
     overlay.innerHTML = `
       <div class="z-modal">
         <h3>${isNew ? 'New source' : 'Edit source'}</h3>
         <label class="z-field"><span>Name</span><input id="f-name" value="${escapeHtml(s.name)}" ${isNew ? '' : 'readonly'} /></label>
-        <label class="z-field"><span>Seeds (one URL per line)</span><textarea id="f-seeds">${s.seeds.join('\n')}</textarea></label>
+        <label class="z-field"><span>Type</span>
+          <select id="f-type">
+            <option value="web" ${!isGoogle ? 'selected' : ''}>web (seed URLs)</option>
+            <option value="google" ${isGoogle ? 'selected' : ''}>google (queries → proxy)</option>
+          </select>
+        </label>
+        <div class="z-field__dyn" id="f-web" ${isGoogle ? 'hidden' : ''}>
+          <label class="z-field"><span>Seeds (one URL per line)</span><textarea id="f-seeds">${s.seeds.join('\n')}</textarea></label>
+        </div>
+        <div class="z-field__dyn" id="f-google" ${isGoogle ? '' : 'hidden'}>
+          <label class="z-field"><span>Queries (one per line)</span><textarea id="f-queries">${(s.queries ?? []).join('\n')}</textarea></label>
+          <p class="z-hint z-hint--warn">⚠ Queries are sent to Google. The Google proxy is opt-in (server env GOOGLE_PROXY_ENABLED). If disabled, saving is rejected.</p>
+        </div>
         <label class="z-field"><span>Allowed domains (comma-separated)</span><textarea id="f-domains">${s.allowedDomains.join(', ')}</textarea></label>
         <label class="z-field"><span>Sitemap URL (optional)</span><input id="f-sitemap" value="${escapeHtml(s.sitemap ?? '')}" /></label>
         <label class="z-field"><span>Max pages</span><input id="f-max" type="number" value="${s.maxPages ?? 50}" /></label>
@@ -171,15 +198,27 @@ export class AdminView {
       </div>`;
     document.body.appendChild(overlay);
     const close = () => overlay.remove();
+    const typeSel = overlay.querySelector('#f-type') as HTMLSelectElement;
+    typeSel.addEventListener('change', () => {
+      const g = typeSel.value === 'google';
+      (overlay.querySelector('#f-google') as HTMLElement).hidden = !g;
+      (overlay.querySelector('#f-web') as HTMLElement).hidden = g;
+    });
     overlay.addEventListener('click', (e) => {
       if (e.target === overlay) close();
     });
     overlay.querySelector('#cancel')!.addEventListener('click', close);
     overlay.querySelector('#save')!.addEventListener('click', async () => {
+      const type = (overlay.querySelector('#f-type') as HTMLSelectElement).value as 'web' | 'google';
       const payload: SourceConfig = {
         name: (overlay.querySelector('#f-name') as HTMLInputElement).value.trim(),
+        type,
         seeds: (overlay.querySelector('#f-seeds') as HTMLTextAreaElement)
           .value.split('\n').map((x) => x.trim()).filter(Boolean),
+        queries: type === 'google'
+          ? (overlay.querySelector('#f-queries') as HTMLTextAreaElement)
+            .value.split('\n').map((x) => x.trim()).filter(Boolean)
+          : undefined,
         allowedDomains: (overlay.querySelector('#f-domains') as HTMLTextAreaElement)
           .value.split(',').map((x) => x.trim()).filter(Boolean),
         sitemap: (overlay.querySelector('#f-sitemap') as HTMLInputElement).value.trim() || undefined,

@@ -17,10 +17,10 @@
   --z-gray-900: #18181b;
   --z-black: #0d0d11;
 
-  /* Brand accent (OpenAI green) */
-  --z-accent: #10a37f;
-  --z-accent-hover: #0e8e6e;
-  --z-accent-soft: rgba(16, 163, 127, 0.1);
+  /* Brand accent */
+  --z-accent: #ff6600;
+  --z-accent-hover: #e65c00;
+  --z-accent-soft: rgba(255, 102, 0, 0.1);
 
   /* Semantic (light default) */
   --z-bg: #ffffff;
@@ -34,8 +34,8 @@
   --z-text-tertiary: var(--z-gray-400);
 
   /* Typography */
-  --z-font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    Helvetica, Arial, sans-serif;
+  --z-font-sans: "LINE Seed JP", "Inter", -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --z-font-mono: "SFMono-Regular", Menlo, Consolas, monospace;
 
   --z-text-xs: 12px;
@@ -99,7 +99,7 @@
   --z-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
   --z-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
 
-  --z-accent-soft: rgba(16, 163, 127, 0.16);
+  --z-accent-soft: rgba(255, 102, 0, 0.16);
 }
 
 * {

@@ -1,5 +1,9 @@
 # Zwep
 
+<p align="center">
+  <img src="web/public/thumbnail.png" alt="Zwep" width="720" />
+</p>
+
 > **A small, self-hosted search engine.** Zwep crawls a curated set of sources,
 > builds its own search index, and serves fast, ranked, faceted results through a
 > clean API. Clients — the cust*m Tab browser extension, a web UI, or any app —
@@ -58,31 +62,35 @@ Full detail in [`docs/architecture.md`](docs/architecture.md).
 
 ---
 
-## Quickstart (planned)
-
-> The docs are complete; scaffolding lands in Phase 0 (see the roadmap).
+## Quickstart
 
 ```bash
 # 1. Clone & install
-git clone <repo> zwep && cd zwep
-pnpm install
+git clone https://github.com/philppplik/zwep zwep && cd zwep
+npm install
 
 # 2. Start infra (Meilisearch + Redis)
 cp .env.example .env
 docker compose up -d meilisearch redis
 
-# 3. Configure your first source
-#    edit config/sources.yaml  (name, seeds, allowedDomains, sitemap, schedule)
+# 3. Configure your first source in config/sources.yaml
+#    (name, seeds, allowedDomains, sitemap, schedule)
 
-# 4. Run a crawl + start the API
-pnpm --filter @zwep/worker crawl gogure
-pnpm --filter @zwep/api dev
+# 4. Start API + web UI together
+npm run dev          # API :8080 + Vite :5173 (proxy → :8080)
+#   or, on Windows, just double-click start-dev.bat
 
-# 5. Search
+# 5. Open http://localhost:5173  and visit /admin to add sources / trigger crawls
+
+# Search
 curl "http://localhost:8080/v1/search?q=klimapolitik&source=gogure"
 ```
 
----
+> **Why a 500 / ECONNREFUSED in /admin?** The Vite dev server proxies
+> `/v1/*` to the API on port 8080. If the API isn't running (or you opened the
+> built `dist/` without a backend), the admin console can't reach it. Always run
+> `npm run dev` (or `start-dev.bat`) so both are up.
+
 
 ## Sources
 

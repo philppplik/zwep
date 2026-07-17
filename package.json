@@ -18,6 +18,7 @@
     "typecheck": "tsc -b --noEmit",
     "api": "node --experimental-strip-types services/api/src/server.ts",
     "crawl": "node --experimental-strip-types services/worker/src/cli.ts",
+    "dev": "node scripts/dev-runner.mjs",
     "infra:up": "docker compose up -d meilisearch redis",
     "infra:down": "docker compose down"
   },
