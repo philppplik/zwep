@@ -9,18 +9,16 @@ echo.
 echo   ZWEP  -  self-hosted search engine
 echo.
 
-REM step 1: node
+REM step 1: find node via powershell (robust)
 echo [1/6] Checking Node.js...
-SET "NODEEXE="
-IF EXIST "C:\Program Files\nodejs\node.exe" SET "NODEEXE=C:\Program Files\nodejs\node.exe"
+FOR /F "tokens=*" %%p IN ('powershell -NoProfile -Command "(Get-Command node -ErrorAction SilentlyContinue).Source"') DO SET "NODEEXE=%%p"
 IF "%NODEEXE%"=="" (
-  echo   Node.js not found at C:\Program Files\nodejs\node.exe
-  echo   Install Node.js LTS from https://nodejs.org then re-run this file.
-  echo   (Log: %LOG%)
+  echo   Node.js not found. Install Node.js LTS from https://nodejs.org then re-run.
+  echo   Log: %LOG%
   pause
   exit /b 1
 )
-echo   OK: node found
+echo   OK: node at %NODEEXE%
 echo.
 
 REM step 2: docker
@@ -28,7 +26,7 @@ echo [2/6] Checking Docker...
 docker info >nul 2>&1
 IF ERRORLEVEL 1 (
   echo   Docker not running. Start Docker Desktop, then re-run.
-  echo   (Log: %LOG%)
+  echo   Log: %LOG%
   pause
   exit /b 1
 )
@@ -47,12 +45,12 @@ start "ZWEP-API" cmd /c "cd /d "%ROOT%" && "%NODEEXE%" --experimental-strip-type
 echo   API launching...
 echo.
 
-REM step 5: wait for api (simple retry, no curl/findstr pipe)
+REM step 5: wait for api
 echo [5/6] Waiting for API (up to 30s)...
 SET /A TRIES=0
 :WAIT
 SET /A TRIES=%TRIES%+1
-powershell -Command "try { (Invoke-WebRequest -Uri http://127.0.0.1:8080/healthz -UseBasicParsing -TimeoutSec 2).StatusCode } catch { 0 }" | findstr /r "200" >nul 2>nul
+powershell -NoProfile -Command "try { (Invoke-WebRequest -Uri http://127.0.0.1:8080/healthz -UseBasicParsing -TimeoutSec 2).StatusCode } catch { 0 }" | findstr /r "200" >nul 2>nul
 IF NOT ERRORLEVEL 1 GOTO READY
 IF %TRIES% GEQ 30 (
   echo   API did not respond in 30s. See %LOG%
