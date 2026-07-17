@@ -150,8 +150,33 @@ export class ResultList {
     `;
   }
 
-  setError(msg: string) {
-    this.el.innerHTML = `<div class="z-error">${escapeHtml(msg)}</div>`;
+  showSkeleton(count = 6) {
+    const rows = Array.from({ length: count })
+      .map(
+        () => `
+      <div class="z-skel">
+        <div class="z-skel__line z-skel__line--sm"></div>
+        <div class="z-skel__line z-skel__line--lg"></div>
+        <div class="z-skel__line z-skel__line--md"></div>
+      </div>`
+      )
+      .join('');
+    this.el.innerHTML = `<div class="z-skel-wrap">${rows}</div>`;
+  }
+
+  setError(msg: string, onRetry?: () => void) {
+    const retry = onRetry
+      ? `<button class="z-btn z-btn--primary z-error__retry" type="button">Try again</button>`
+      : '';
+    this.el.innerHTML = `
+      <div class="z-error">
+        <div class="z-error__icon">!</div>
+        <div class="z-error__msg">${escapeHtml(msg)}</div>
+        ${retry}
+      </div>`;
+    if (onRetry) {
+      this.el.querySelector('.z-error__retry')!.addEventListener('click', onRetry);
+    }
   }
 
   clearStatus() {

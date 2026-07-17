@@ -4,6 +4,10 @@ import { SearchBar, ResultList } from './components.ts';
 import { AdminView } from './admin.ts';
 import { search, stats } from './client.ts';
 
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 const root = document.getElementById('app')!;
 
 // ---------- Theme ----------
@@ -20,7 +24,25 @@ function paintIcon(btn: HTMLButtonElement) {
   btn.textContent = dark ? '☀' : '☾';
 }
 
-// ---------- Main ----------
+// ---------- Top bar (shared across views) ----------
+function renderTopBar(opts: { back?: boolean; title?: string } = {}) {
+  const bar = document.createElement('div');
+  bar.className = 'z-topbar';
+  bar.innerHTML = `
+    <a class="z-topbar__brand" href="/" data-back>
+      <img class="z-topbar__logo" src="/zwep-logo.png" alt="Zwep" />
+      <span>Zwep</span>
+    </a>
+    ${opts.back ? '<button class="z-topbar__back" data-back>← Search</button>' : ''}
+    ${opts.title ? `<span class="z-topbar__title">${escapeHtml(opts.title)}</span>` : ''}
+  `;
+  bar.querySelector('[data-back]')!.addEventListener('click', (e) => {
+    e.preventDefault();
+    history.pushState({}, '', '/');
+    route();
+  });
+  return bar;
+}
 const main = document.createElement('main');
 main.className = 'z-main';
 root.appendChild(main);
@@ -61,6 +83,14 @@ function renderResultsView() {
   main.className = 'z-main';
   main.innerHTML = '';
   main.appendChild(searchBar.el);
+  // logo + brand mark above the results list
+  const brand = document.createElement('div');
+  brand.className = 'z-results__brand';
+  brand.innerHTML = `
+    <img class="z-results__logo" src="/zwep-logo.png" alt="Zwep" />
+    <span>Zwep</span>
+  `;
+  main.appendChild(brand);
   results.el.style.display = '';
 }
 
@@ -74,13 +104,18 @@ const searchBar = new SearchBar(async (q) => {
 async function doSearch() {
   if (!state.q.trim()) return;
   renderResultsView();
-  results.clearStatus();
+  results.showSkeleton();
   state.loading = true;
   try {
     const resp = await search({ q: state.q, facets: true, limit: 20 });
     results.render(resp, state.q);
   } catch (e) {
-    results.setError((e as Error).message || 'Search failed');
+    const err = e as Error;
+    const isNet = err.message.includes('fetch') || err.message.includes('Failed to fetch') || err.message.includes('Network');
+    const friendly = isNet
+      ? 'Cannot reach the search service. Is the API running?'
+      : err.message || 'Something went wrong while searching.';
+    results.setError(friendly, () => doSearch());
   } finally {
     state.loading = false;
   }
@@ -99,10 +134,11 @@ function renderSettings() {
   results.el.style.display = 'none';
   const wrap = document.createElement('div');
   wrap.className = 'z-overlay-page z-settings';
+  wrap.appendChild(renderTopBar({ back: true, title: 'Settings' }));
   const dark = document.documentElement.getAttribute('data-theme') === 'dark';
-  wrap.innerHTML = `
-    <div class="z-settings__card">
-      <h2>Settings</h2>
+  const card = document.createElement('div');
+  card.className = 'z-settings__card';
+  card.innerHTML = `
       <div class="z-field">
         <span>Appearance</span>
         <button class="z-btn" id="set-theme">Switch to ${dark ? 'light' : 'dark'}</button>
@@ -110,19 +146,18 @@ function renderSettings() {
       <p class="z-hint">Theme is stored in your browser (localStorage).</p>
       <div class="z-field">
         <span>Sources</span>
-        <a class="z-btn z-btn--primary" href="/admin">Manage sources →</a>
-      </div>
-      <a class="z-footer__link" href="/" id="set-back">← Back to search</a>
-    </div>`;
+        <a class="z-btn z-btn--primary" href="/admin" data-admin>Manage sources →</a>
+      </div>`;
+  wrap.appendChild(card);
   root.appendChild(wrap);
   wrap.querySelector('#set-theme')!.addEventListener('click', () => {
     const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
     applyTheme(next);
     renderSettings();
   });
-  wrap.querySelector('#set-back')!.addEventListener('click', (e) => {
+  wrap.querySelector('[data-admin]')!.addEventListener('click', (e) => {
     e.preventDefault();
-    history.pushState({}, '', '/');
+    history.pushState({}, '', '/admin');
     route();
   });
 }
@@ -135,6 +170,7 @@ function route() {
     const admin = new AdminView();
     results.el.style.display = 'none';
     main.style.display = 'none';
+    root.appendChild(renderTopBar({ back: true, title: 'Admin' }));
     root.appendChild(admin.el);
     admin.mount().catch(() => {});
     window.addEventListener('popstate', () => admin.unmount(), { once: true });
