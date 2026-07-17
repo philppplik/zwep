@@ -50,7 +50,7 @@ export class Indexer {
     const sort = sortToMeili(params.sort ?? 'relevance');
 
     const hybrid = params.semantic === true;
-    const fuzzy = params.fuzzy !== false; // default ON
+    const fuzzy = params.fuzzy !== false; // default ON (typo tolerance is in index settings)
     const res: any = await (this.adapter as any).index.search(params.q, {
       limit,
       offset,
@@ -60,8 +60,6 @@ export class Indexer {
       attributesToCrop: ['excerpt'],
       cropLength: 40,
       facets: params.facets ? ['source', 'type', 'tags', 'lang'] : undefined,
-      // fuzzy typo-tolerance is ON by default in index settings; disable per-query if requested
-      ...(fuzzy ? {} : { disableTypoTolerance: true }),
       // semantic / hybrid vector search (only works if embedder configured)
       ...(hybrid
         ? {
