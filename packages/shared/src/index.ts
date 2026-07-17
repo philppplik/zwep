@@ -97,4 +97,5 @@ export interface SourceConfig {
   schedule?: string;
   maxDepth?: number;
   maxPages?: number;
+  enabled?: boolean;       // if false, excluded from all searches (default true)
 }

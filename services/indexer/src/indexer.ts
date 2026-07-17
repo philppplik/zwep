@@ -1,7 +1,13 @@
 import { getAdapter, type IndexAdapter } from './meili.ts';
+import { loadSources } from '@zwep/config';
 import type { Document, SearchParams, SearchResponse, SearchResult, SearchSort } from '@zwep/shared';
 
-/** Search layer over the index adapter. Owns query translation + response shape. */
+/** Returns the names of all enabled sources (excluded from search if disabled). */
+export function enabledSourceNames(): string[] {
+  return loadSources()
+    .filter((s) => s.enabled !== false)
+    .map((s) => s.name);
+}
 export class Indexer {
   private adapter: IndexAdapter;
 
@@ -32,7 +38,9 @@ export class Indexer {
     const offset = Math.max(params.offset ?? 0, 0);
 
     const filter: string[] = [];
-    if (params.source?.length) filter.push(`source IN [${params.source.map((s) => `"${s}"`).join(', ')}]`);
+    // Default: only search enabled sources (unless caller pins specific sources)
+    const activeSources = params.source?.length ? params.source : enabledSourceNames();
+    if (activeSources.length) filter.push(`source IN [${activeSources.map((s) => `"${s}"`).join(', ')}]`);
     if (params.type?.length) filter.push(`type IN [${params.type.map((s) => `"${s}"`).join(', ')}]`);
     if (params.lang) filter.push(`lang = "${params.lang}"`);
     if (params.tag?.length) filter.push(`tags IN [${params.tag.map((s) => `"${s}"`).join(', ')}]`);

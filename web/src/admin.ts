@@ -82,7 +82,7 @@ export class AdminView {
     body.innerHTML = `
       <table class="z-table">
         <thead>
-          <tr><th>Name</th><th>Domains</th><th>Seeds</th><th>Max pages</th><th></th></tr>
+          <tr><th>Name</th><th>Active</th><th>Domains</th><th>Seeds</th><th>Max pages</th><th></th></tr>
         </thead>
         <tbody>
           ${this.sources
@@ -90,6 +90,12 @@ export class AdminView {
               (s) => `
             <tr data-name="${escapeHtml(s.name)}">
               <td><strong>${escapeHtml(s.name)}</strong></td>
+              <td>
+                <label class="z-switch z-switch--sm">
+                  <input type="checkbox" data-act="toggle" ${s.enabled !== false ? 'checked' : ''}>
+                  <span></span>
+                </label>
+              </td>
               <td>${s.allowedDomains.map((d) => `<span class="z-chip">${escapeHtml(d)}</span>`).join(' ')}</td>
               <td>${s.seeds.length}</td>
               <td>${s.maxPages ?? '—'}</td>
@@ -107,6 +113,10 @@ export class AdminView {
     `;
     body.querySelectorAll<HTMLTableRowElement>('tr[data-name]').forEach((tr) => {
       const name = tr.dataset.name!;
+      tr.querySelector('[data-act="toggle"]')!.addEventListener('click', (e) => {
+        const checked = (e.target as HTMLInputElement).checked;
+        this.toggleSource(name, checked);
+      });
       tr.querySelector('[data-act="crawl"]')!.addEventListener('click', () => this.triggerCrawl(name));
       tr.querySelector('[data-act="edit"]')!.addEventListener('click', () => {
         const src = this.sources.find((s) => s.name === name)!;
@@ -115,6 +125,20 @@ export class AdminView {
       tr.querySelector('[data-act="del"]')!.addEventListener('click', () => this.deleteSource(name));
     });
     if (this.activeTask) this.renderTask(this.activeTask);
+  }
+
+  private async toggleSource(name: string, enabled: boolean) {
+    const src = this.sources.find((s) => s.name === name);
+    if (!src) return;
+    const updated: SourceConfig = { ...src, enabled };
+    try {
+      await adminUpsertSource(ADMIN_KEY, updated);
+      this.toast(`${name} ${enabled ? 'enabled' : 'disabled'} — ${enabled ? 'now in search' : 'excluded from search'}`);
+      await this.load();
+    } catch (e) {
+      this.toast((e as Error).message, true);
+      await this.load(); // re-render to reset toggle state
+    }
   }
 
   private async triggerCrawl(name: string) {
