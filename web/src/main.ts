@@ -64,7 +64,7 @@ const results = new ResultList();
 root.appendChild(results.el);
 
 // ---------- Search state ----------
-const state = { q: '', offset: 0, loading: false };
+const state = { q: '', offset: 0, loading: false, type: '' as string };
 
 function renderHome() {
   main.className = 'z-main z-main--center';
@@ -78,6 +78,13 @@ function renderHome() {
   results.el.style.display = 'none';
   searchBar.focus();
 }
+const TABS = [
+  { id: '', label: 'All' },
+  { id: 'article', label: 'Articles' },
+  { id: 'image', label: 'Images' },
+  { id: 'video', label: 'Videos' },
+  { id: 'product', label: 'Products' },
+];
 
 function renderResultsView() {
   main.className = 'z-main';
@@ -91,6 +98,20 @@ function renderResultsView() {
   `;
   main.appendChild(brand);
   main.appendChild(searchBar.el);
+  // tabs (All / Articles / Images / Videos / Products)
+  const tabs = document.createElement('div');
+  tabs.className = 'z-tabs';
+  tabs.innerHTML = TABS.map(
+    (t) => `<button class="z-tab${state.type === t.id ? ' is-active' : ''}" type="button" data-type="${t.id}">${t.label}</button>`
+  ).join('');
+  tabs.querySelectorAll<HTMLButtonElement>('.z-tab').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      state.type = btn.dataset.type || '';
+      history.replaceState(null, '', `?q=${encodeURIComponent(state.q)}${state.type ? `&type=${state.type}` : ''}`);
+      doSearch();
+    });
+  });
+  main.appendChild(tabs);
   results.el.style.display = '';
 }
 
@@ -107,7 +128,12 @@ async function doSearch() {
   results.showSkeleton();
   state.loading = true;
   try {
-    const resp = await search({ q: state.q, facets: true, limit: 20 });
+    const resp = await search({
+      q: state.q,
+      facets: true,
+      limit: 20,
+      type: state.type ? [state.type] : undefined,
+    });
     results.render(resp, state.q);
   } catch (e) {
     const err = e as Error;
@@ -185,6 +211,8 @@ function route() {
   if (initialQ) {
     searchBar.setValue(initialQ);
     state.q = initialQ;
+    const initialType = new URLSearchParams(location.search).get('type');
+    state.type = initialType || '';
     doSearch();
   } else {
     renderHome();

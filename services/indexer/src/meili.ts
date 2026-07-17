@@ -11,8 +11,8 @@ export interface IndexAdapter {
   get(id: string): Promise<Document | null>;
 }
 
-const SEARCHABLE = ['title', 'headings', 'excerpt', 'content', 'tags'];
-const FILTERABLE = ['source', 'type', 'lang', 'tags', 'published_at'];
+const SEARCHABLE = ['title', 'headings', 'excerpt', 'content', 'tags', 'structured'];
+const FILTERABLE = ['source', 'type', 'lang', 'tags', 'published_at', 'favicon'];
 const SORTABLE = ['published_at', 'crawled_at'];
 const RANKING = ['words', 'typo', 'proximity', 'attribute', 'sort', 'exactness'];
 
@@ -50,7 +50,8 @@ export class MeiliAdapter implements IndexAdapter {
     if (!docs.length) return;
     // strip heavy `content` field from index storage? keep it searchable but
     // it's fine for v1; Meili compresses well.
-    await this.index.addDocuments(docs, { primaryKey: 'id' });
+    const task = await this.index.addDocuments(docs, { primaryKey: 'id' });
+    await this.index.waitForTask(task.taskUid);
   }
 
   async delete(id: string): Promise<void> {

@@ -3,7 +3,7 @@
  * Mirrors docs/api.md §Document schema and §Search response.
  */
 
-export type DocType = 'article' | 'page' | 'doc' | 'unknown';
+export type DocType = 'article' | 'page' | 'doc' | 'image' | 'video' | 'product' | 'unknown';
 
 export interface Document {
   id: string;
@@ -21,6 +21,8 @@ export interface Document {
   crawled_at: string;
   content_hash: string;
   tags: string[];
+  favicon?: string;
+  structured?: Record<string, unknown> | null;
   quality?: QualityScore;
 }
 

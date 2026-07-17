@@ -778,3 +778,174 @@
   align-self: flex-start;
 }
 
+/* ---------- Tabs (All / Articles / Images / Videos / Products) ---------- */
+.z-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--z-space-1);
+  margin: var(--z-space-4) 0 var(--z-space-2);
+  border-bottom: 1px solid var(--z-border);
+  padding-bottom: var(--z-space-2);
+}
+.z-tab {
+  font-family: inherit;
+  font-size: var(--z-text-sm);
+  font-weight: 500;
+  color: var(--z-text-secondary);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--z-radius-full);
+  padding: var(--z-space-1) var(--z-space-4);
+  cursor: pointer;
+  transition: all var(--z-dur-fast) var(--z-ease);
+}
+.z-tab:hover {
+  color: var(--z-text);
+  background: var(--z-bg-hover);
+}
+.z-tab.is-active {
+  color: var(--z-accent);
+  background: var(--z-accent-soft);
+  border-color: rgba(255, 102, 0, 0.25);
+  font-weight: 600;
+}
+
+/* ---------- Result favicon ---------- */
+.z-result__fav {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  border-radius: 3px;
+  flex: none;
+}
+
+/* ---------- Blur-backdrop preview overlay ---------- */
+.z-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  transition: opacity var(--z-dur) var(--z-ease);
+}
+.z-overlay.is-open {
+  opacity: 1;
+}
+.z-overlay__backdrop {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--z-bg) 35%, rgba(0,0,0,0.45));
+  backdrop-filter: blur(10px) saturate(120%);
+  -webkit-backdrop-filter: blur(10px) saturate(120%);
+}
+.z-overlay__panel {
+  position: relative;
+  width: min(720px, 92vw);
+  max-height: 88vh;
+  overflow: auto;
+  background: var(--z-bg-elevated);
+  border: 1px solid var(--z-border);
+  border-radius: var(--z-radius-xl);
+  box-shadow: var(--z-shadow-lg);
+  padding: var(--z-space-8);
+  transform: translateY(8px) scale(0.98);
+  transition: transform var(--z-dur) var(--z-ease);
+}
+.z-overlay.is-open .z-overlay__panel {
+  transform: translateY(0) scale(1);
+}
+.z-overlay__close {
+  position: absolute;
+  top: var(--z-space-4);
+  right: var(--z-space-4);
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+  line-height: 1;
+  border: 1px solid var(--z-border);
+  background: var(--z-bg-subtle);
+  color: var(--z-text-secondary);
+  border-radius: 50%;
+  cursor: pointer;
+}
+.z-overlay__close:hover {
+  color: var(--z-text);
+  border-color: var(--z-border-strong);
+}
+.z-overlay__body {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--z-space-6);
+}
+@media (min-width: 640px) {
+  .z-overlay__body {
+    grid-template-columns: 1fr 280px;
+  }
+}
+.z-overlay__title {
+  font-size: var(--z-text-2xl);
+  font-weight: 600;
+  margin: 0 0 var(--z-space-1);
+  letter-spacing: -0.01em;
+}
+.z-overlay__title a {
+  color: var(--z-link);
+}
+.z-overlay__excerpt {
+  color: var(--z-text-secondary);
+  line-height: var(--z-leading-relaxed);
+  margin: var(--z-space-3) 0 var(--z-space-5);
+}
+
+/* ---------- Knowledge card (Google-style right rail) ---------- */
+.z-card {
+  background: var(--z-bg-subtle);
+  border: 1px solid var(--z-border);
+  border-radius: var(--z-radius-lg);
+  padding: var(--z-space-5);
+}
+.z-card__type {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--z-text-tertiary);
+  margin-bottom: var(--z-space-2);
+}
+.z-card__img {
+  width: 100%;
+  height: 140px;
+  object-fit: cover;
+  border-radius: var(--z-radius-md);
+  margin-bottom: var(--z-space-3);
+  background: var(--z-bg-hover);
+}
+.z-card__name {
+  font-size: var(--z-text-lg);
+  font-weight: 600;
+  margin: 0 0 var(--z-space-2);
+}
+.z-card__desc {
+  font-size: var(--z-text-sm);
+  color: var(--z-text-secondary);
+  line-height: 1.55;
+  margin: 0 0 var(--z-space-3);
+}
+.z-card__row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--z-space-3);
+  font-size: var(--z-text-sm);
+  padding: var(--z-space-2) 0;
+  border-top: 1px solid var(--z-border);
+}
+.z-card__row span {
+  color: var(--z-text-tertiary);
+}
+.z-card__row b {
+  color: var(--z-text);
+  font-weight: 600;
+  text-align: right;
+}

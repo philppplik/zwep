@@ -161,6 +161,18 @@ export class ResultList {
     document.addEventListener('click', () => {
       this.el.querySelectorAll('.z-quality__pop.is-open').forEach((p) => p.classList.remove('is-open'));
     }, { once: true });
+    // open preview overlay when clicking a result (not the link itself)
+    this.el.querySelectorAll<HTMLElement>('.z-result').forEach((art) => {
+      art.addEventListener('click', (e) => {
+        if ((e.target as HTMLElement).closest('a, button')) return;
+        const raw = art.getAttribute('data-doc');
+        if (!raw) return;
+        try {
+          const doc = JSON.parse(decodeURIComponent(raw)) as SearchResult;
+          openOverlay(doc);
+        } catch { /* ignore */ }
+      });
+    });
   }
 
   showSkeleton(count = 6) {
@@ -224,8 +236,9 @@ function resultHtml(r: SearchResult, i: number): string {
       </span>`
     : '';
   return `
-    <article class="z-result" style="animation-delay:${Math.min(i * 20, 200)}ms">
+    <article class="z-result" style="animation-delay:${Math.min(i * 20, 200)}ms" data-doc='${encodeURIComponent(JSON.stringify(r))}'>
       <div class="z-result__head">
+        ${r.favicon ? `<img class="z-result__fav" src="${encodeURI(r.favicon)}" alt="" loading="lazy" />` : ''}
         <span class="z-result__source">${escapeHtml(r.source)}</span>
         ${qBadge}
       </div>
@@ -260,6 +273,73 @@ function facetChips(facets: NonNullable<SearchResponse['facets']>): string {
     }
   }
   return out.join('');
+}
+
+/** Knowledge-card (Google-style right rail) built from JSON-LD structured data. */
+function knowledgeCardHtml(doc: SearchResult): string {
+  const s = doc.structured as Record<string, any> | null;
+  if (!s) return '';
+  const type = String(s['@type'] ?? '');
+  const name = s.name ?? s.headline ?? doc.title;
+  const desc = s.description ?? '';
+  const img = s.image ?? s.thumbnailUrl ?? '';
+  const rows: string[] = [];
+  if (s.author?.name) rows.push(`<div class="z-card__row"><span>Author</span><b>${escapeHtml(String(s.author.name))}</b></div>`);
+  if (s.datePublished) rows.push(`<div class="z-card__row"><span>Published</span><b>${escapeHtml(String(s.datePublished))}</b></div>`);
+  if (s.brand?.name) rows.push(`<div class="z-card__row"><span>Brand</span><b>${escapeHtml(String(s.brand.name))}</b></div>`);
+  if (s.offers?.price || s.price) rows.push(`<div class="z-card__row"><span>Price</span><b>${escapeHtml(String(s.offers?.price ?? s.price))} ${escapeHtml(String(s.offers?.priceCurrency ?? ''))}</b></div>`);
+  return `
+    <aside class="z-card">
+      <div class="z-card__type">${escapeHtml(type)}</div>
+      ${img ? `<img class="z-card__img" src="${encodeURI(String(img))}" alt="" />` : ''}
+      <h4 class="z-card__name">${escapeHtml(String(name))}</h4>
+      ${desc ? `<p class="z-card__desc">${escapeHtml(String(desc))}</p>` : ''}
+      ${rows.join('')}
+    </aside>
+  `;
+}
+
+/** Blur-backdrop preview overlay for a single result. */
+function openOverlay(doc: SearchResult) {
+  const existing = document.querySelector('.z-overlay');
+  if (existing) existing.remove();
+  const host = safeHost(doc.url);
+  const overlay = document.createElement('div');
+  overlay.className = 'z-overlay';
+  overlay.innerHTML = `
+    <div class="z-overlay__backdrop" data-close></div>
+    <div class="z-overlay__panel" role="dialog" aria-modal="true">
+      <button class="z-overlay__close" type="button" aria-label="Close" data-close>×</button>
+      <div class="z-overlay__body">
+        <div class="z-overlay__main">
+          <div class="z-result__head">
+            ${doc.favicon ? `<img class="z-result__fav" src="${encodeURI(doc.favicon)}" alt="" />` : ''}
+            <span class="z-result__source">${escapeHtml(doc.source)}</span>
+          </div>
+          <h3 class="z-overlay__title"><a href="${encodeURI(doc.url)}" target="_blank" rel="noopener">${escapeHtml(doc.title)}</a></h3>
+          <div class="z-result__url">${host}</div>
+          <p class="z-overlay__excerpt">${escapeHtml(doc.excerpt)}</p>
+          <a class="z-btn z-btn--primary" href="${encodeURI(doc.url)}" target="_blank" rel="noopener">Open page ↗</a>
+        </div>
+        ${knowledgeCardHtml(doc) ? `<div class="z-overlay__side">${knowledgeCardHtml(doc)}</div>` : ''}
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add('is-open'));
+  overlay.querySelectorAll<HTMLElement>('[data-close]').forEach((el) =>
+    el.addEventListener('click', () => {
+      overlay.classList.remove('is-open');
+      setTimeout(() => overlay.remove(), 180);
+    })
+  );
+  document.addEventListener('keydown', function onKey(e) {
+    if (e.key === 'Escape') {
+      overlay.classList.remove('is-open');
+      setTimeout(() => overlay.remove(), 180);
+      document.removeEventListener('keydown', onKey);
+    }
+  });
 }
 
 function escapeHtml(s: string): string {
