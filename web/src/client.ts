@@ -53,3 +53,57 @@ export async function getDocument(id: string): Promise<SearchResult | null> {
 export async function stats(): Promise<{ ok: boolean; indexed: number }> {
   return getJson(`${BASE}/stats`);
 }
+
+// ---------- Admin ----------
+export interface CrawlTask {
+  id: string;
+  source: string;
+  status: 'running' | 'done' | 'error';
+  startedAt: string;
+  finishedAt?: string;
+  summary?: { pages: number; skipped: number; failed: number; indexed: number; seconds: number };
+  error?: string;
+}
+
+export async function adminListSources(adminKey: string): Promise<SourceConfig[]> {
+  const r = await getJson<{ sources: SourceConfig[] }>(`${BASE}/admin/sources?admin_key=${encodeURIComponent(adminKey)}`);
+  return r.sources;
+}
+
+export async function adminUpsertSource(adminKey: string, src: SourceConfig): Promise<SourceConfig> {
+  const res = await fetch(`${BASE}/admin/sources?admin_key=${encodeURIComponent(adminKey)}`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(src),
+  });
+  if (!res.ok) {
+    const b = await res.json().catch(() => ({}));
+    throw new Error(b?.error?.message || `Save failed: ${res.status}`);
+  }
+  return (await res.json()).source;
+}
+
+export async function adminDeleteSource(adminKey: string, name: string): Promise<void> {
+  const res = await fetch(`${BASE}/admin/sources/${encodeURIComponent(name)}?admin_key=${encodeURIComponent(adminKey)}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
+}
+
+export async function adminCrawl(adminKey: string, source: string, maxPages?: number): Promise<string> {
+  const res = await fetch(`${BASE}/admin/crawl?admin_key=${encodeURIComponent(adminKey)}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ source, maxPages }),
+  });
+  if (!res.ok) {
+    const b = await res.json().catch(() => ({}));
+    throw new Error(b?.error?.message || `Crawl failed: ${res.status}`);
+  }
+  return (await res.json()).taskId;
+}
+
+export async function adminCrawlStatus(adminKey: string, taskId: string): Promise<CrawlTask> {
+  const r = await getJson<{ task: CrawlTask }>(`${BASE}/admin/crawl/${encodeURIComponent(taskId)}?admin_key=${encodeURIComponent(adminKey)}`);
+  return r.task;
+}

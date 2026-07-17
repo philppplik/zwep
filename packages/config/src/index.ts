@@ -1,5 +1,5 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import yaml from 'js-yaml';
 import { z } from 'zod';
@@ -30,25 +30,59 @@ export function loadEnv(): Env {
   return cached;
 }
 
-const sourceSchema = z.object({
-  name: z.string(),
+export const sourceSchema = z.object({
+  name: z.string().min(1).max(64),
   seeds: z.array(z.string().url()),
-  allowedDomains: z.array(z.string()),
+  allowedDomains: z.array(z.string().min(1)),
   sitemap: z.string().url().optional(),
   schedule: z.string().optional(),
   maxDepth: z.number().int().min(0).max(10).optional(),
   maxPages: z.number().int().min(1).optional(),
 });
 
-/** Load sources.yaml (array of SourceConfig). */
-export function loadSources(path?: string): SourceConfig[] {
-  const file = path ?? resolve(__dirname, '../../../config/sources.yaml');
+/** Path to the writable runtime store (created from sources.yaml on first run). */
+const STORE = resolve(__dirname, '../../../data/sources.json');
+
+function seedFromYaml(): SourceConfig[] {
+  const file = resolve(__dirname, '../../../config/sources.yaml');
   const raw = yaml.load(readFileSync(file, 'utf8')) as unknown;
   const arr = Array.isArray(raw) ? raw : (raw as any)?.sources;
   if (!Array.isArray(arr)) throw new Error(`No sources array in ${file}`);
   return arr.map((s) => sourceSchema.parse(s) as SourceConfig);
 }
 
+/** Load all sources from the runtime store (seeded from sources.yaml if absent). */
+export function loadSources(): SourceConfig[] {
+  if (!existsSync(STORE)) {
+    const seed = seedFromYaml();
+    saveSources(seed);
+    return seed;
+  }
+  return JSON.parse(readFileSync(STORE, 'utf8')) as SourceConfig[];
+}
+
+export function saveSources(sources: SourceConfig[]): void {
+  mkdirSync(dirname(STORE), { recursive: true });
+  writeFileSync(STORE, JSON.stringify(sources, null, 2), 'utf8');
+}
+
 export function getSource(name: string): SourceConfig | undefined {
   return loadSources().find((s) => s.name === name);
+}
+
+export function upsertSource(src: SourceConfig): SourceConfig {
+  const sources = loadSources();
+  const i = sources.findIndex((s) => s.name === src.name);
+  if (i >= 0) sources[i] = src;
+  else sources.push(src);
+  saveSources(sources);
+  return src;
+}
+
+export function deleteSource(name: string): boolean {
+  const sources = loadSources();
+  const next = sources.filter((s) => s.name !== name);
+  if (next.length === sources.length) return false;
+  saveSources(next);
+  return true;
 }

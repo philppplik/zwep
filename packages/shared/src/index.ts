@@ -21,6 +21,16 @@ export interface Document {
   crawled_at: string;
   content_hash: string;
   tags: string[];
+  quality?: QualityScore;
+}
+
+/** Quality scoring (0..1 composite + component breakdown). */
+export interface QualityScore {
+  score: number;
+  length: number;      // 0..1 — content volume
+  freshness: number;   // 0..1 — recency of published_at (1 if none known)
+  title: number;       // 0..1 — title clarity
+  structure: number;   // 0..1 — headings / semantic structure
 }
 
 export interface SearchResult extends Document {

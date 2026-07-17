@@ -1,6 +1,7 @@
 import './styles/tokens.css';
 import './styles/app.css';
 import { SearchBar, ResultList } from './components.ts';
+import { AdminView } from './admin.ts';
 import { search, stats } from './client.ts';
 
 const root = document.getElementById('app')!;
@@ -23,6 +24,7 @@ header.innerHTML = `
     <span>Zwep</span>
   </div>
   <div class="z-header__actions">
+    <a class="z-header__link" id="nav-admin" href="/admin">Admin</a>
     <button class="z-icon-btn" id="theme-toggle" aria-label="Toggle theme">
       <span id="theme-icon"></span>
     </button>
@@ -97,15 +99,38 @@ async function doSearch() {
   }
 }
 
-// ---------- Boot ----------
-const initialQ = new URLSearchParams(location.search).get('q');
-if (initialQ) {
-  searchBar.setValue(initialQ);
-  state.q = initialQ;
-  doSearch();
-} else {
-  renderHome();
+// ---------- Boot / routing ----------
+function route() {
+  const path = location.pathname;
+  if (path.startsWith('/admin')) {
+    const admin = new AdminView();
+    results.el.style.display = 'none';
+    main.style.display = 'none';
+    root.appendChild(admin.el);
+    admin.mount().catch(() => {});
+    // clean up on navigation away
+    window.addEventListener('popstate', () => admin.unmount(), { once: true });
+    return;
+  }
+  main.style.display = '';
+  const initialQ = new URLSearchParams(location.search).get('q');
+  if (initialQ) {
+    searchBar.setValue(initialQ);
+    state.q = initialQ;
+    doSearch();
+  } else {
+    renderHome();
+  }
 }
+
+route();
+
+// intercept Admin link to use SPA-style nav (no full reload)
+header.querySelector('#nav-admin')!.addEventListener('click', (e) => {
+  e.preventDefault();
+  history.pushState({}, '', '/admin');
+  route();
+});
 
 // show indexed count in subtitle after stats resolves
 stats()

@@ -4,6 +4,7 @@ import { franc } from 'franc';
 import { createHash } from 'node:crypto';
 import type { Document, DocType } from '@zwep/shared';
 import type { CrawlPage } from '@zwep/crawler';
+import { scoreDocument } from '@zwep/quality';
 
 function meta(doc: Document, name: string): string | undefined {
   const el = doc.querySelector(
@@ -86,7 +87,7 @@ export function extract(page: CrawlPage, source: string): Document | null {
     .update(content || title)
     .digest('hex');
 
-  return {
+  const out: Document = {
     id: page.id,
     url: page.url,
     canonical_url: page.canonical_url,
@@ -103,4 +104,6 @@ export function extract(page: CrawlPage, source: string): Document | null {
     content_hash: contentHash,
     tags,
   };
+  out.quality = scoreDocument(out);
+  return out;
 }

@@ -165,15 +165,25 @@ function resultHtml(r: SearchResult, i: number): string {
   const tags = (r.tags ?? [])
     .map((t) => `<span class="z-chip">${escapeHtml(t)}</span>`)
     .join('');
+  const q = r.quality;
+  const qBadge = q
+    ? `<span class="z-quality z-quality--${qualityBand(q.score)}" title="length ${Math.round(q.length * 100)}% · freshness ${Math.round(q.freshness * 100)}% · title ${Math.round(q.title * 100)}% · structure ${Math.round(q.structure * 100)}%">${Math.round(q.score * 100)}</span>`
+    : '';
   return `
     <article class="z-result" style="animation-delay:${Math.min(i * 20, 200)}ms">
-      <div class="z-result__source">${escapeHtml(r.source)} · ${escapeHtml(r.lang)}</div>
+      <div class="z-result__source">${escapeHtml(r.source)} · ${escapeHtml(r.lang)} ${qBadge}</div>
       <h3 class="z-result__title"><a href="${encodeURI(r.url)}" target="_blank" rel="noopener">${title}</a></h3>
       <div class="z-result__url">${escapeHtml(r.url)}</div>
       <p class="z-result__excerpt">${excerpt}</p>
       ${tags ? `<div class="z-result__tags">${tags}</div>` : ''}
     </article>
   `;
+}
+
+function qualityBand(score: number): 'low' | 'medium' | 'high' {
+  if (score >= 0.7) return 'high';
+  if (score >= 0.45) return 'medium';
+  return 'low';
 }
 
 function facetChips(facets: NonNullable<SearchResponse['facets']>): string {

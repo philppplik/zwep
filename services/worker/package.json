@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "type": "module",
   "main": "./src/cli.ts",
+  "exports": {
+    ".": "./src/cli.ts",
+    "./crawl-lib.ts": "./src/crawl-lib.ts"
+  },
   "scripts": {
     "crawl": "node --experimental-strip-types src/cli.ts"
   },
