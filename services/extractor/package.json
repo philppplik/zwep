@@ -1,0 +1,14 @@
+{
+  "name": "@zwep/extractor",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@zwep/shared": "*",
+    "@zwep/crawler": "*",
+    "@mozilla/readability": "^0.5.0",
+    "jsdom": "^25.0.1",
+    "franc": "^6.2.0"
+  }
+}

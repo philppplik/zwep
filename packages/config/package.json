@@ -1,0 +1,12 @@
+{
+  "name": "@zwep/config",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@zwep/shared": "*",
+    "js-yaml": "^4.1.0",
+    "zod": "^3.24.1"
+  }
+}

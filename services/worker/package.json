@@ -1,0 +1,15 @@
+{
+  "name": "@zwep/worker",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/cli.ts",
+  "scripts": {
+    "crawl": "node --experimental-strip-types src/cli.ts"
+  },
+  "dependencies": {
+    "@zwep/config": "*",
+    "@zwep/crawler": "*",
+    "@zwep/extractor": "*",
+    "@zwep/indexer": "*"
+  }
+}

@@ -1,0 +1,26 @@
+# Zwep crawl sources.
+# Each entry seeds the crawler. Only URLs matching allowedDomains are followed.
+# robots.txt + crawl-delay are always honoured regardless of these settings.
+
+sources:
+  # Das Hauptprojekt — Gogure Media Verlagsindex.
+  - name: gogure
+    seeds:
+      - https://gogure.media/
+    allowedDomains:
+      - gogure.media
+    sitemap: https://gogure.media/sitemap.xml
+    schedule: "0 * * * *"   # hourly
+    maxDepth: 4
+    maxPages: 20000
+
+  # Smoke-test source: kleine, statische, crawler-freundliche Seite.
+  # Gut geeignet für den ersten echten End-to-End-Crawl (wenig Seiten).
+  - name: example
+    seeds:
+      - https://example.com/
+    allowedDomains:
+      - example.com
+    schedule: "0 0 * * *"   # daily
+    maxDepth: 2
+    maxPages: 50
