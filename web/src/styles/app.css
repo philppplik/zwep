@@ -1174,3 +1174,58 @@
   font-size: var(--z-text-xs);
   color: var(--z-text-tertiary);
 }
+.z-overview__badge {
+  display: inline-block;
+  margin-left: var(--z-space-2);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--z-accent);
+  background: var(--z-accent-soft);
+  border-radius: var(--z-radius-sm);
+  padding: 1px 6px;
+}
+
+/* ---------- Fuzzy toggle ---------- */
+.z-fuzzy-toggle {
+  margin: var(--z-space-2) 0 0;
+  padding: 6px 12px;
+  border: 1px solid var(--z-border);
+  border-radius: var(--z-radius-full);
+  font-family: inherit;
+  font-size: var(--z-text-sm);
+  font-weight: 500;
+  color: var(--z-text-secondary);
+  background: var(--z-bg-elevated);
+  cursor: pointer;
+  transition: all var(--z-dur-fast) var(--z-ease);
+}
+.z-fuzzy-toggle:hover {
+  border-color: var(--z-border-strong);
+}
+.z-fuzzy-toggle.is-on {
+  color: #fff;
+  background: var(--z-accent);
+  border-color: var(--z-accent);
+}
+
+/* ---------- Graph export ---------- */
+.z-graph-export {
+  margin: var(--z-space-3) 0;
+  padding: 6px 14px;
+  border: 1px solid var(--z-accent);
+  border-radius: var(--z-radius-md);
+  font-family: inherit;
+  font-size: var(--z-text-sm);
+  font-weight: 600;
+  color: var(--z-accent);
+  background: transparent;
+  cursor: pointer;
+  transition: all var(--z-dur-fast) var(--z-ease);
+}
+.z-graph-export:hover {
+  background: var(--z-accent);
+  color: #fff;
+}
+

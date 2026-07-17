@@ -3,7 +3,7 @@ import cors from '@fastify/cors';
 import { loadEnv, isGoogleProxyEnabled, loadSources, getSource, upsertSource, deleteSource, sourceSchema } from '@zwep/config';
 import { Indexer } from '@zwep/indexer';
 import { crawlSource, type CrawlSummary } from '@zwep/worker/crawl-lib.ts';
-import { getLlmProvider, applyRuntimeLlmSettings } from '@zwep/llm';
+import { getLlmProvider, getCachedOverview, setCachedOverview } from '@zwep/llm';
 import type { SearchSort, SourceConfig } from '@zwep/shared';
 
 const env = loadEnv();
@@ -71,6 +71,13 @@ export async function build() {
     try {
       const { KnowledgeGraph } = await import('@zwep/graph');
       if (!graphInst) graphInst = new KnowledgeGraph();
+      // full-graph export (shareable JSON)
+      if ((req.query as any).export === 'json') {
+        const all = graphInst.all();
+        reply.header('content-type', 'application/json');
+        reply.header('content-disposition', `attachment; filename="zwep-graph-${Date.now()}.json"`);
+        return all;
+      }
       const neighborhood = graphInst.neighborhood(q.trim(), 1, 40);
       const stats = graphInst.stats();
       return { ok: true, query: q.trim(), ...neighborhood, stats };
@@ -80,6 +87,7 @@ export async function build() {
   });
 
   // Phase B3: AI Overview — summarize top curated results via optional LLM
+  // Caching: completed summaries stored in SQLite (TTL 7d) keyed by provider+model+query.
   app.get('/v1/overview', async (req, reply) => {
     const q = (req.query as any).q as string | undefined;
     if (!q || !q.trim()) return badRequest(reply, 'invalid_query', "Parameter 'q' is required.");
@@ -90,6 +98,17 @@ export async function build() {
     try {
       const top = await indexer.search({ q: q.trim(), limit: 5, highlight: false });
       if (!top.results.length) return { ok: true, query: q.trim(), overview: '', sources: [] };
+      // cache hit?
+      const cached = getCachedOverview(provider.name, provider.model, q.trim());
+      if (cached) {
+        return {
+          ok: true,
+          query: q.trim(),
+          overview: cached,
+          cached: true,
+          sources: top.results.map((r) => ({ title: r.title, url: r.url, source: r.source })),
+        };
+      }
       const context = top.results
         .map((r, i) => `[${i + 1}] ${r.title}\n${r.excerpt}`)
         .join('\n\n');
@@ -99,10 +118,12 @@ export async function build() {
         `Nutze NUR Informationen aus den Quellen. Antworte ohne Einleitung wie "Hier ist eine Zusammenfassung".\n\n` +
         `Quellen:\n${context}`;
       const overview = await provider.complete(prompt);
+      setCachedOverview(provider.name, provider.model, q.trim(), overview);
       return {
         ok: true,
         query: q.trim(),
         overview,
+        cached: false,
         sources: top.results.map((r) => ({ title: r.title, url: r.url, source: r.source })),
       };
     } catch (e) {

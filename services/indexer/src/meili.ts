@@ -42,7 +42,7 @@ export class MeiliAdapter implements IndexAdapter {
       filterableAttributes: FILTERABLE,
       sortableAttributes: SORTABLE,
       rankingRules: RANKING,
-      typoTolerance: { enabled: true, minWordSizeForTypos: { oneTypo: 5, twoTypos: 9 } },
+      typoTolerance: { enabled: true, minWordSizeForTypos: { oneTypo: 4, twoTypos: 8 } },
     };
     // enable vector search only if an embedding provider is reachable
     const provider = await getEmbedProvider();

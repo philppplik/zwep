@@ -83,6 +83,7 @@ export interface SearchParams {
   facets?: boolean;
   highlight?: boolean;
   semantic?: boolean;
+  fuzzy?: boolean;
 }
 
 /** Source definition (docs/api.md §admin/sources body + sources.yaml). */

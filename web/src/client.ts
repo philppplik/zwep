@@ -31,6 +31,8 @@ export async function search(params: Partial<SearchParams> & { q: string }): Pro
   if (params.sort) sp.set('sort', params.sort);
   if (params.facets) sp.set('facets', 'true');
   if (params.highlight === false) sp.set('highlight', 'false');
+  if (params.semantic) sp.set('semantic', 'true');
+  if (params.fuzzy === false) sp.set('fuzzy', 'false');
   return getJson<SearchResponse>(`${BASE}/search?${sp.toString()}`);
 }
 
@@ -82,6 +84,7 @@ export interface OverviewResponse {
   ok: boolean;
   query: string;
   overview: string;
+  cached?: boolean;
   sources: { title: string; url: string; source: string }[];
 }
 

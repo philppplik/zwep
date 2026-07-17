@@ -64,7 +64,7 @@ const results = new ResultList();
 root.appendChild(results.el);
 
 // ---------- Search state ----------
-const state = { q: '', offset: 0, loading: false, type: '' as string, semantic: false };
+const state = { q: '', offset: 0, loading: false, type: '' as string, semantic: false, fuzzy: true };
 
 function renderHome() {
   main.className = 'z-main z-main--center';
@@ -132,6 +132,19 @@ function renderResultsView() {
   });
   main.appendChild(toggle);
 
+  // fuzzy / typo-tolerance toggle
+  const fuzz = document.createElement('button');
+  fuzz.className = `z-fuzzy-toggle${state.fuzzy ? ' is-on' : ''}`;
+  fuzz.type = 'button';
+  fuzz.textContent = state.fuzzy ? ' Fuzzy: ON' : ' Fuzzy: OFF';
+  fuzz.title = 'Tolerant search — finds "Merkel" even if you type "Märkel"';
+  fuzz.addEventListener('click', () => {
+    state.fuzzy = !state.fuzzy;
+    history.replaceState(null, '', `?q=${encodeURIComponent(state.q)}${state.type ? `&type=${state.type}` : ''}&fuzzy=${state.fuzzy ? 1 : 0}`);
+    doSearch();
+  });
+  main.appendChild(fuzz);
+
   // AI Overview container (filled by renderOverview if enabled)
   const overviewBox = document.createElement('div');
   overviewBox.id = 'z-overview';
@@ -148,6 +161,15 @@ async function showGraph() {
   const graphEl = document.createElement('div');
   graphEl.className = 'z-graph-view';
   main.appendChild(graphEl);
+  // export button
+  const exportBtn = document.createElement('button');
+  exportBtn.className = 'z-graph-export';
+  exportBtn.type = 'button';
+  exportBtn.textContent = '⬇ Export JSON';
+  exportBtn.addEventListener('click', () => {
+    window.open(`/v1/graph?q=${encodeURIComponent(state.q)}&export=json`, '_blank');
+  });
+  main.appendChild(exportBtn);
   await renderGraph(graphEl, state.q);
 }
 
@@ -174,6 +196,7 @@ async function doSearch() {
       limit: 20,
       type: state.type ? [state.type] : undefined,
       semantic: state.semantic || undefined,
+      fuzzy: state.fuzzy,
     });
     results.render(resp, state.q);
   } catch (e) {

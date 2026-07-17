@@ -501,7 +501,7 @@ export async function renderOverview(el: HTMLElement, query: string) {
     .join('');
   el.innerHTML = `
     <div class="z-overview">
-      <div class="z-overview__head"><span class="z-overview__spark">✦</span> Übersicht mit KI</div>
+      <div class="z-overview__head"><span class="z-overview__spark">✦</span> Übersicht mit KI${data.cached ? ' <span class="z-overview__badge">cached</span>' : ''}</div>
       <div class="z-overview__body">${escapeHtml(data.overview).replace(/\n/g, '<br>')}</div>
       ${sources ? `<div class="z-overview__sources">${sources}</div>` : ''}
       <div class="z-overview__foot">Zusammenfassung aus kuratierten Quellen · Generative KI ist experimentell.</div>
