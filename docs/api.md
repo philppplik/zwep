@@ -41,7 +41,7 @@ Full-text search over the index.
 
 ### Example
 ```
-GET /v1/search?q=klimapolitik&source=gogure&lang=de&limit=10&facets=true
+GET /v1/search?q=klimapolitik&source=example&lang=de&limit=10&facets=true
 ```
 
 ### Response `200`
@@ -54,11 +54,11 @@ GET /v1/search?q=klimapolitik&source=gogure&lang=de&limit=10&facets=true
   "took_ms": 12,
   "results": [
     {
-      "id": "gogure:9f2a…",
-      "url": "https://gogure.media/artikel/klimapolitik-2026",
+      "id": "example:9f2a…",
+      "url": "https://example.com/artikel/klimapolitik-2026",
       "title": "Klimapolitik <mark>2026</mark>: Was sich ändert",
       "excerpt": "Ein Überblick über die neuen <mark>klimapolitik</mark>ischen …",
-      "source": "gogure",
+      "source": "example",
       "type": "article",
       "lang": "de",
       "author": "Redaktion",
@@ -68,7 +68,7 @@ GET /v1/search?q=klimapolitik&source=gogure&lang=de&limit=10&facets=true
     }
   ],
   "facets": {
-    "source": { "gogure": 128 },
+    "source": { "example": 128 },
     "type":   { "article": 110, "page": 18 },
     "tag":    { "klima": 64, "politik": 51, "energie": 22 }
   }
@@ -93,7 +93,7 @@ Fast autocomplete for the search-as-you-type dropdown (used by cust*m Tab).
 {
   "query": "klima",
   "suggestions": [
-    { "text": "klimapolitik 2026", "url": "https://gogure.media/…", "type": "article" },
+    { "text": "klimapolitik 2026", "url": "https://example.com/…", "type": "article" },
     { "text": "klimaneutralität", "url": null, "type": "term" }
   ]
 }
@@ -108,14 +108,14 @@ Fetch a single indexed document by id.
 ### Response `200`
 ```json
 {
-  "id": "gogure:9f2a…",
-  "url": "https://gogure.media/artikel/klimapolitik-2026",
-  "canonical_url": "https://gogure.media/artikel/klimapolitik-2026",
+  "id": "example:9f2a…",
+  "url": "https://example.com/artikel/klimapolitik-2026",
+  "canonical_url": "https://example.com/artikel/klimapolitik-2026",
   "title": "Klimapolitik 2026: Was sich ändert",
   "excerpt": "Ein Überblick …",
   "content": "Vollständiger extrahierter Fließtext …",
   "headings": ["Was ändert sich", "Zeitplan", "Kritik"],
-  "source": "gogure",
+  "source": "example",
   "type": "article",
   "lang": "de",
   "author": "Redaktion",
@@ -174,10 +174,10 @@ The canonical shape written by the indexer and returned by the API.
 ### `POST /admin/sources` body
 ```json
 {
-  "name": "gogure",
-  "seeds": ["https://gogure.media/"],
-  "allowedDomains": ["gogure.media"],
-  "sitemap": "https://gogure.media/sitemap.xml",
+  "name": "example",
+  "seeds": ["https://example.com/"],
+  "allowedDomains": ["example.com"],
+  "sitemap": "https://example.com/sitemap.xml",
   "schedule": "0 * * * *",
   "maxDepth": 4,
   "maxPages": 20000
@@ -225,7 +225,7 @@ All errors share one shape:
 ```js
 async function zwepSuggest(q) {
   const r = await fetch(
-    `https://api.zwep.example/v1/suggest?q=${encodeURIComponent(q)}&source=gogure&limit=6`
+    `https://api.zwep.example/v1/suggest?q=${encodeURIComponent(q)}&source=example&limit=6`
   );
   if (!r.ok) return [];
   const { suggestions } = await r.json();

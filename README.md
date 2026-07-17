@@ -88,7 +88,7 @@ npm run dev          # API :8080 + Vite :5173 (proxy → :8080)
 # 5. Open http://localhost:5173  and visit /admin to add sources / trigger crawls
 
 # Search
-curl "http://localhost:8080/v1/search?q=klimapolitik&source=gogure"
+curl "http://localhost:8080/v1/search?q=klimapolitik&source=example"
 ```
 
 > **Why a 500 / ECONNREFUSED in /admin?** The Vite dev server proxies

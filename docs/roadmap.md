@@ -28,7 +28,7 @@
 - [ ] Extractor: Readability + metadata + content hash
 - [ ] Indexer: Meilisearch upsert + config (searchable/filterable/sortable)
 - [ ] API: `GET /search` + `GET /healthz`
-- [ ] `sources.yaml` with the first real source (e.g. gogure.media)
+- [ ] `sources.yaml` with the first real source (e.g. example.com)
 
 **Done when:** crawl a real site and get ranked JSON results from `/search`.
 
@@ -97,5 +97,5 @@ Every phase must keep:
 ---
 
 ## Suggested first milestone
-**"One real site, searchable, pretty."** = Phase 1 + Phase 2 for gogure.media.
+**"One real site, searchable, pretty."** = Phase 1 + Phase 2 for example.com.
 That alone is a demoable, brandable mini search engine.
