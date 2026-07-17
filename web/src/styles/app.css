@@ -1,0 +1,290 @@
+/* Zwep Web — app layout + components (OpenAI-inspired) */
+
+/* ---------- Header ---------- */
+.z-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  height: var(--z-header-h);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--z-space-5);
+  background: color-mix(in srgb, var(--z-bg) 85%, transparent);
+  backdrop-filter: saturate(180%) blur(12px);
+  border-bottom: 1px solid var(--z-border);
+}
+.z-header__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--z-space-2);
+  font-weight: 600;
+  font-size: var(--z-text-lg);
+  letter-spacing: -0.01em;
+  color: var(--z-text);
+}
+.z-header__mark {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--z-radius-sm);
+  background: var(--z-accent);
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-weight: 700;
+  font-size: var(--z-text-sm);
+}
+.z-header__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--z-space-2);
+}
+.z-icon-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--z-radius-md);
+  border: 1px solid var(--z-border);
+  background: var(--z-bg-elevated);
+  color: var(--z-text-secondary);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: background var(--z-dur-fast) var(--z-ease),
+    color var(--z-dur-fast) var(--z-ease), border-color var(--z-dur-fast) var(--z-ease);
+}
+.z-icon-btn:hover {
+  background: var(--z-bg-hover);
+  color: var(--z-text);
+}
+
+/* ---------- Hero / search home ---------- */
+.z-main {
+  max-width: var(--z-content-max);
+  margin: 0 auto;
+  padding: var(--z-space-16) var(--z-space-5) var(--z-space-10);
+}
+.z-home {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--z-space-6);
+  padding-top: var(--z-space-12);
+}
+.z-home__title {
+  font-size: var(--z-text-3xl);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+.z-home__subtitle {
+  color: var(--z-text-secondary);
+  font-size: var(--z-text-lg);
+  margin: 0;
+  max-width: 460px;
+}
+
+/* ---------- Search bar ---------- */
+.z-search {
+  position: relative;
+  width: 100%;
+}
+.z-search__input {
+  width: 100%;
+  height: 52px;
+  padding: 0 var(--z-space-12) 0 var(--z-space-5);
+  font-size: var(--z-text-lg);
+  font-family: inherit;
+  color: var(--z-text);
+  background: var(--z-bg-elevated);
+  border: 1px solid var(--z-border);
+  border-radius: var(--z-radius-full);
+  outline: none;
+  transition: border-color var(--z-dur) var(--z-ease),
+    box-shadow var(--z-dur) var(--z-ease);
+}
+.z-search__input::placeholder {
+  color: var(--z-text-tertiary);
+}
+.z-search__input:focus {
+  border-color: var(--z-accent);
+  box-shadow: 0 0 0 3px var(--z-accent-soft);
+}
+.z-search__btn {
+  position: absolute;
+  right: 5px;
+  top: 5px;
+  bottom: 5px;
+  width: 42px;
+  border: none;
+  border-radius: var(--z-radius-full);
+  background: var(--z-accent);
+  color: #fff;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: background var(--z-dur-fast) var(--z-ease);
+}
+.z-search__btn:hover {
+  background: var(--z-accent-hover);
+}
+
+/* ---------- Suggestions ---------- */
+.z-suggest {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: var(--z-bg-elevated);
+  border: 1px solid var(--z-border);
+  border-radius: var(--z-radius-lg);
+  box-shadow: var(--z-shadow-lg);
+  overflow: hidden;
+  z-index: 30;
+}
+.z-suggest__item {
+  display: flex;
+  align-items: center;
+  gap: var(--z-space-3);
+  padding: var(--z-space-3) var(--z-space-4);
+  cursor: pointer;
+  font-size: var(--z-text-base);
+  color: var(--z-text);
+  transition: background var(--z-dur-fast) var(--z-ease);
+}
+.z-suggest__item:hover,
+.z-suggest__item.is-active {
+  background: var(--z-bg-hover);
+}
+.z-suggest__type {
+  font-size: var(--z-text-xs);
+  color: var(--z-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ---------- Results ---------- */
+.z-results {
+  max-width: var(--z-content-max);
+  margin: 0 auto;
+  padding: var(--z-space-6) var(--z-space-5) var(--z-space-16);
+}
+.z-results__meta {
+  color: var(--z-text-secondary);
+  font-size: var(--z-text-sm);
+  margin-bottom: var(--z-space-5);
+}
+.z-result {
+  padding: var(--z-space-4) 0;
+  border-bottom: 1px solid var(--z-border);
+  animation: z-fade-in var(--z-dur) var(--z-ease) both;
+}
+.z-result__source {
+  font-size: var(--z-text-xs);
+  color: var(--z-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: var(--z-space-1);
+}
+.z-result__title {
+  font-size: var(--z-text-xl);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0 0 var(--z-space-1);
+  line-height: var(--z-leading-tight);
+}
+.z-result__title a {
+  color: var(--z-text);
+}
+.z-result__title a:hover {
+  color: var(--z-accent);
+}
+.z-result__url {
+  font-size: var(--z-text-sm);
+  color: var(--z-accent);
+  margin-bottom: var(--z-space-2);
+  word-break: break-all;
+}
+.z-result__excerpt {
+  font-size: var(--z-text-base);
+  color: var(--z-text-secondary);
+  line-height: var(--z-leading-relaxed);
+  margin: 0;
+}
+.z-result em {
+  font-style: normal;
+  font-weight: 600;
+  background: var(--z-accent-soft);
+  border-radius: 3px;
+  padding: 0 1px;
+}
+.z-result__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--z-space-2);
+  margin-top: var(--z-space-3);
+}
+.z-chip {
+  font-size: var(--z-text-xs);
+  color: var(--z-text-secondary);
+  background: var(--z-bg-subtle);
+  border: 1px solid var(--z-border);
+  border-radius: var(--z-radius-full);
+  padding: 2px var(--z-space-3);
+}
+
+/* ---------- Facets ---------- */
+.z-facets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--z-space-2);
+  margin-bottom: var(--z-space-5);
+}
+.z-facet {
+  font-size: var(--z-text-sm);
+  color: var(--z-text-secondary);
+  background: var(--z-bg-elevated);
+  border: 1px solid var(--z-border);
+  border-radius: var(--z-radius-full);
+  padding: var(--z-space-1) var(--z-space-3);
+  cursor: pointer;
+  transition: all var(--z-dur-fast) var(--z-ease);
+}
+.z-facet:hover {
+  border-color: var(--z-border-strong);
+}
+.z-facet.is-active {
+  background: var(--z-accent);
+  border-color: var(--z-accent);
+  color: #fff;
+}
+
+/* ---------- States ---------- */
+.z-empty,
+.z-error {
+  text-align: center;
+  color: var(--z-text-secondary);
+  padding: var(--z-space-12) var(--z-space-5);
+  font-size: var(--z-text-lg);
+}
+.z-error {
+  color: #d9534f;
+}
+
+@keyframes z-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
