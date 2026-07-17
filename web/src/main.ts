@@ -54,7 +54,7 @@ footer.className = 'z-footer';
 footer.innerHTML = `
   <span class="z-footer__tag">A small, self-hosted search engine. Search what you curate.</span>
   <nav class="z-footer__nav">
-    <a class="z-footer__link" id="nav-admin" href="/admin">Admin</a>
+    <a class="z-footer__link" id="nav-admin" href="/admin">Library</a>
     <a class="z-footer__link" id="nav-settings" href="/settings">Settings</a>
   </nav>
 `;
@@ -421,7 +421,7 @@ function route() {
     const admin = new AdminView();
     results.el.style.display = 'none';
     main.style.display = 'none';
-    root.appendChild(renderTopBar({ back: true, title: 'Admin' }));
+    root.appendChild(renderTopBar({ back: true, title: 'Library' }));
     root.appendChild(admin.el);
     admin.mount().catch(() => {});
     window.addEventListener('popstate', () => admin.unmount(), { once: true });
