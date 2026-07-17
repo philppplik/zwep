@@ -221,7 +221,7 @@ All errors share one shape:
 
 ## 9. Client integration snippets
 
-### cust*m Tab (dashboard "search Gogure")
+### cust*m Tab (dashboard "search Zwep")
 ```js
 async function zwepSuggest(q) {
   const r = await fetch(

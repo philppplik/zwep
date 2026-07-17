@@ -10,7 +10,7 @@
 > just query the API.
 >
 > Think of it as a private, brandable mini-Google for a universe of content you
-> choose: e.g. **Gogure Media** articles, your own sites, or a whitelist of domains.
+> choose: e.g. your own sites, curated publications, or a whitelist of domains.
 
 ---
 
@@ -155,7 +155,7 @@ searchable, pretty"* — Phase 1 + Phase 2 for a single source (see the roadmap)
 ## Relationship to cust*m Tab
 
 Zwep is a **separate, standalone project**. The [cust*m Tab](https://github.com/philppplik/custm-tab)
-browser extension is just one possible client: it can offer "search Gogure" in its
+browser extension is just one possible client: it can offer "search Zwep" in its
 dashboard by calling the Zwep API. Neither depends on the other's internals — only
 the API contract in [`docs/api.md`](docs/api.md).
 

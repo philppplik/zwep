@@ -62,14 +62,14 @@
 ---
 
 ## Phase 4 — cust*m Tab integration
-**Goal:** "search Gogure" inside the browser new tab.
+**Goal:** "search Zwep" inside the browser new tab.
 
 - [ ] Add Zwep as an optional search source in cust*m Tab settings
 - [ ] Dashboard suggest dropdown backed by `/suggest`
 - [ ] "Open in Zwep web UI" for full results
 - [ ] Graceful offline/error fallback (never blocks web search)
 
-**Done when:** typing in cust*m Tab shows Gogure results inline.
+**Done when:** typing in cust*m Tab shows Zwep results inline.
 
 ---
 

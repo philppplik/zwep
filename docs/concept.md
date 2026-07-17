@@ -5,14 +5,14 @@
 > extension, web UI, or the cust*m Tab dashboard) queries the API.
 >
 > Zwep is **not** a general web crawler. It is a *focused* index — you decide what
-> gets crawled (e.g. Gogure Media content, your own sites, a whitelist of domains).
+> gets crawled (e.g. your own sites, curated publications, a whitelist of domains).
 
 ---
 
 ## 1. Why build our own index?
 
 Public search engines are general-purpose, ad-driven, and give you no control over
-ranking, freshness, or coverage. For a publisher like **Gogure Media** there is real
+ranking, freshness, or coverage. For a publisher or content site there is real
 value in a *focused* engine:
 
 | Problem with public search | What Zwep gives you |
@@ -48,10 +48,10 @@ world" feature inside cust*m Tab.
 
 ## 3. Primary use-cases
 
-1. **Gogure Media search** — index all published articles/issues so readers (and
+1. **Site / publication search** — index all published articles/issues so readers (and
    editors) get instant, ranked, faceted search across the whole catalogue.
 2. **cust*m Tab integration** — the extension's dashboard search bar can query the
-   Zwep API as an optional source ("search Gogure") alongside web engines.
+   Zwep API as an optional source ("search Zwep") alongside web engines.
 3. **Internal knowledge index** — crawl a whitelist of docs/wikis/sites you care
    about into one searchable place.
 4. **White-label site search** — drop-in search for any WordPress site the agency
