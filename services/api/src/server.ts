@@ -131,7 +131,46 @@ export async function build() {
     }
   });
 
-  // Phase B3: runtime settings push from frontend (localStorage → backend)
+  // Phase B4: list locally installed Ollama models (for Settings dropdown)
+  app.get('/v1/ollama-models', async (req, reply) => {
+    try {
+      const env = loadEnv();
+      const host = env.OLLAMA_HOST.replace(/\/$/, '');
+      const res = await fetch(`${host}/api/tags`);
+      if (!res.ok) throw new Error(`status ${res.status}`);
+      const data = (await res.json()) as { models?: { name: string; model?: string; size?: number; details?: any }[] };
+      const models = (data.models || []).map((m) => ({
+        id: m.name || m.model || '',
+        name: m.name || m.model || '',
+        size: m.size ?? 0,
+      }));
+      return { ok: true, models };
+    } catch (e) {
+      return reply.code(503).send({ error: { code: 'ollama_unavailable', message: (e as Error).message, status: 503 } });
+    }
+  });
+
+  // Phase B4: list OpenRouter models (for Settings dropdown)
+  app.get('/v1/openrouter-models', async (req, reply) => {
+    try {
+      const res = await fetch('https://openrouter.ai/api/v1/models', {
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) throw new Error(`status ${res.status}`);
+      const data = (await res.json()) as { data?: { id: string; name?: string; context_length?: number; pricing?: any }[] };
+      const models = (data.data || [])
+        .filter((m) => m.id)
+        .map((m) => ({
+          id: m.id,
+          name: m.name || m.id,
+          context_length: m.context_length ?? 0,
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      return { ok: true, models };
+    } catch (e) {
+      return reply.code(503).send({ error: { code: 'openrouter_unavailable', message: (e as Error).message, status: 503 } });
+    }
+  });
   app.post('/v1/settings', async (req, reply) => {
     const b = req.body as any;
     if (b?.llmProvider || b?.ollamaLlmModel || b?.openrouterLlmModel || b?.openrouterLlmKey !== undefined) {

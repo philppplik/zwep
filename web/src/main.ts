@@ -1,8 +1,9 @@
 import './styles/tokens.css';
 import './styles/app.css';
 import { SearchBar, ResultList, renderGraph, renderOverview } from './components.ts';
+import { search, suggest, graph, overview, ollamaModels, openrouterModels, type ModelInfo } from './client.ts';
 import { AdminView } from './admin.ts';
-import { search, stats } from './client.ts';
+import { stats } from './client.ts';
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -119,32 +120,6 @@ function renderResultsView() {
   });
   main.appendChild(tabs);
 
-  // semantic toggle (only meaningful when lexical results show)
-  const toggle = document.createElement('button');
-  toggle.className = `z-semantic-toggle${state.semantic ? ' is-on' : ''}`;
-  toggle.type = 'button';
-  toggle.textContent = state.semantic ? 'Semantic: ON' : 'Semantic: OFF';
-  toggle.title = 'Hybrid semantic search (requires an embedding provider)';
-  toggle.addEventListener('click', () => {
-    state.semantic = !state.semantic;
-    history.replaceState(null, '', `?q=${encodeURIComponent(state.q)}${state.type ? `&type=${state.type}` : ''}&semantic=${state.semantic ? 1 : 0}`);
-    doSearch();
-  });
-  main.appendChild(toggle);
-
-  // fuzzy / typo-tolerance toggle
-  const fuzz = document.createElement('button');
-  fuzz.className = `z-fuzzy-toggle${state.fuzzy ? ' is-on' : ''}`;
-  fuzz.type = 'button';
-  fuzz.textContent = state.fuzzy ? ' Fuzzy: ON' : ' Fuzzy: OFF';
-  fuzz.title = 'Tolerant search — finds "Merkel" even if you type "Märkel"';
-  fuzz.addEventListener('click', () => {
-    state.fuzzy = !state.fuzzy;
-    history.replaceState(null, '', `?q=${encodeURIComponent(state.q)}${state.type ? `&type=${state.type}` : ''}&fuzzy=${state.fuzzy ? 1 : 0}`);
-    doSearch();
-  });
-  main.appendChild(fuzz);
-
   // AI Overview container (filled by renderOverview if enabled)
   const overviewBox = document.createElement('div');
   overviewBox.id = 'z-overview';
@@ -157,7 +132,6 @@ function renderResultsView() {
 async function showGraph() {
   renderResultsView();
   results.el.style.display = 'none';
-  main.querySelector('.z-semantic-toggle')?.remove();
   const graphEl = document.createElement('div');
   graphEl.className = 'z-graph-view';
   main.appendChild(graphEl);
@@ -286,13 +260,13 @@ function renderSettings() {
       </select>
     </div>
     <div class="z-field" data-prev="ollama" style="${s.llmProvider === 'ollama' ? '' : 'display:none'}">
-      <span>Ollama Model</span>
-      <select id="set-ollama-model">${OLLAMA_PRESETS.map((m) => `<option ${m === s.ollamaModel ? 'selected' : ''}>${m}</option>`).join('')}</select>
+      <span>Ollama Model <small id="ollama-status">loading…</small></span>
+      <select id="set-ollama-model"></select>
       <input class="z-settings__custom" id="set-ollama-custom" placeholder="Custom model…" value="${s.ollamaModel && !OLLAMA_PRESETS.includes(s.ollamaModel) ? s.ollamaModel : ''}" />
     </div>
     <div class="z-field" data-prev="openrouter" style="${s.llmProvider === 'openrouter' ? '' : 'display:none'}">
-      <span>OpenRouter Model</span>
-      <select id="set-or-model">${OR_PRESETS.map((m) => `<option ${m === s.openrouterModel ? 'selected' : ''}>${m}</option>`).join('')}</select>
+      <span>OpenRouter Model <small id="or-status">loading…</small></span>
+      <select id="set-or-model"></select>
       <input class="z-settings__custom" id="set-or-custom" placeholder="Custom model…" value="${s.openrouterModel && !OR_PRESETS.includes(s.openrouterModel) ? s.openrouterModel : ''}" />
       <span>OpenRouter API Key</span>
       <input type="password" id="set-or-key" placeholder="sk-or-…" value="${s.openrouterKey}" />
@@ -337,16 +311,32 @@ function renderSettings() {
     });
     persist();
   });
-  wrap.querySelector('#set-ollama-model')!.addEventListener('change', persist);
+  wrap.querySelector('#set-ollama-model')!.addEventListener('change', (e) => {
+    if ((e.target as HTMLSelectElement).value === '__custom') {
+      const c = wrap.querySelector('#set-ollama-custom') as HTMLInputElement;
+      c.value = '';
+      c.focus();
+    }
+    persist();
+  });
   wrap.querySelector('#set-ollama-custom')!.addEventListener('input', persist);
-  wrap.querySelector('#set-or-model')!.addEventListener('change', persist);
-  wrap.querySelector('#set-or-custom')!.addEventListener('input', persist);
+  wrap.querySelector('#set-or-model')!.addEventListener('change', (e) => {
+    if ((e.target as HTMLSelectElement).value === '__custom') {
+      const c = wrap.querySelector('#set-or-custom') as HTMLInputElement;
+      c.value = '';
+      c.focus();
+    }
+    persist();
+  });
   wrap.querySelector('#set-or-key')!.addEventListener('input', persist);
   wrap.querySelector('[data-admin]')!.addEventListener('click', (e) => {
     e.preventDefault();
     history.pushState({}, '', '/admin');
     route();
   });
+
+  // async-load available models into the dropdowns
+  loadModelDropdowns(wrap, s);
 }
 
 function customOrSelect(wrap: HTMLElement, sel: string, custom: string, fallback: string): string {
@@ -354,6 +344,57 @@ function customOrSelect(wrap: HTMLElement, sel: string, custom: string, fallback
   if (c) return c;
   const s = (wrap.querySelector(sel) as HTMLSelectElement).value;
   return s || fallback;
+}
+
+/** Fetch installed/free models and populate the provider dropdowns. */
+async function loadModelDropdowns(wrap: HTMLElement, s: ZwepSettings) {
+  const ollamaSel = wrap.querySelector('#set-ollama-model') as HTMLSelectElement | null;
+  const orSel = wrap.querySelector('#set-or-model') as HTMLSelectElement | null;
+  const ollamaStatus = wrap.querySelector('#ollama-status') as HTMLElement | null;
+  const orStatus = wrap.querySelector('#or-status') as HTMLElement | null;
+
+  // Ollama: locally installed models
+  if (ollamaSel) {
+    try {
+      const models = await ollamaModels();
+      if (models.length) {
+        const opts = models.map((m) => {
+          const selected = m.id === s.ollamaModel ? 'selected' : '';
+          const label = m.size ? `${m.name} (${(m.size / 1e9).toFixed(1)}GB)` : m.name;
+          return `<option value="${escapeHtml(m.id)}" ${selected}>${escapeHtml(label)}</option>`;
+        });
+        // keep presets that aren't installed, plus a custom entry
+        ollamaSel.innerHTML = opts.join('') + OLLAMA_PRESETS.filter((p) => !models.some((m) => m.id === p)).map((p) => `<option value="${p}" ${p === s.ollamaModel ? 'selected' : ''}>${p}</option>`).join('') + `<option value="__custom" ${!models.some((m) => m.id === s.ollamaModel) && !OLLAMA_PRESETS.includes(s.ollamaModel) ? 'selected' : ''}>Custom…</option>`;
+        if (ollamaStatus) ollamaStatus.textContent = `${models.length} installed`;
+      } else {
+        ollamaSel.innerHTML = OLLAMA_PRESETS.map((p) => `<option value="${p}" ${p === s.ollamaModel ? 'selected' : ''}>${p}</option>`).join('') + `<option value="__custom">Custom…</option>`;
+        if (ollamaStatus) ollamaStatus.textContent = 'Ollama offline — presets only';
+      }
+    } catch {
+      if (ollamaStatus) ollamaStatus.textContent = 'unavailable';
+    }
+  }
+
+  // OpenRouter: all available models
+  if (orSel) {
+    try {
+      const models = await openrouterModels();
+      if (models.length) {
+        const opts = models.map((m) => {
+          const selected = m.id === s.openrouterModel ? 'selected' : '';
+          const label = m.context_length ? `${m.name} (${m.context_length.toLocaleString()} ctx)` : m.name;
+          return `<option value="${escapeHtml(m.id)}" ${selected}>${escapeHtml(label)}</option>`;
+        });
+        orSel.innerHTML = opts.join('') + `<option value="__custom" ${!models.some((m) => m.id === s.openrouterModel) && !OR_PRESETS.includes(s.openrouterModel) ? 'selected' : ''}>Custom…</option>`;
+        if (orStatus) orStatus.textContent = `${models.length} available`;
+      } else {
+        orSel.innerHTML = OR_PRESETS.map((p) => `<option value="${p}" ${p === s.openrouterModel ? 'selected' : ''}>${p}</option>`).join('') + `<option value="__custom">Custom…</option>`;
+        if (orStatus) orStatus.textContent = 'no models — presets only';
+      }
+    } catch {
+      if (orStatus) orStatus.textContent = 'unavailable';
+    }
+  }
 }
 
 /** Push user LLM settings to the backend at runtime (no restart needed). */

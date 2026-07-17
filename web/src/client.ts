@@ -92,6 +92,31 @@ export async function overview(q: string): Promise<OverviewResponse> {
   return getJson<OverviewResponse>(`${BASE}/overview?q=${encodeURIComponent(q)}`);
 }
 
+export interface ModelInfo {
+  id: string;
+  name: string;
+  size?: number;
+  context_length?: number;
+}
+
+export async function ollamaModels(): Promise<ModelInfo[]> {
+  try {
+    const r = await getJson<{ ok: boolean; models: ModelInfo[] }>(`${BASE}/ollama-models`);
+    return r.models || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function openrouterModels(): Promise<ModelInfo[]> {
+  try {
+    const r = await getJson<{ ok: boolean; models: ModelInfo[] }>(`${BASE}/openrouter-models`);
+    return r.models || [];
+  } catch {
+    return [];
+  }
+}
+
 // ---------- Admin ----------
 export interface CrawlTask {
   id: string;
