@@ -64,6 +64,11 @@ Full detail in [`docs/architecture.md`](docs/architecture.md).
 
 ## Quickstart
 
+**Easiest (Windows):** double-click `start-dev.bat` in the project root. It checks
+Node + Docker, starts Meilisearch/Redis, the API (`:8080`) and the web UI (`:5173`),
+waits until the API is ready, and opens the browser. To stop, press any key in that
+window (or just close it).
+
 ```bash
 # 1. Clone & install
 git clone https://github.com/philppplik/zwep zwep && cd zwep
