@@ -41,7 +41,8 @@ export class Indexer {
 
     const sort = sortToMeili(params.sort ?? 'relevance');
 
-    const res = await (this.adapter as any).index.search(params.q, {
+    const hybrid = params.semantic === true;
+    const res: any = await (this.adapter as any).index.search(params.q, {
       limit,
       offset,
       filter: filter.length ? filter : undefined,
@@ -50,8 +51,15 @@ export class Indexer {
       attributesToCrop: ['excerpt'],
       cropLength: 40,
       facets: params.facets ? ['source', 'type', 'tags', 'lang'] : undefined,
+      // semantic / hybrid vector search (only works if embedder configured)
+      ...(hybrid
+        ? {
+            hybrid: { semanticRatio: 0.7 },
+            retrieveVectors: false,
+          }
+        : {}),
     });
-    if (process.env.ZWEP_DEBUG) console.error('[indexer] meili facets=', params.facets ? ['source', 'type', 'tags', 'lang'] : undefined, 'filter=', filter);
+    if (process.env.ZWEP_DEBUG) console.error('[indexer] hybrid=', hybrid, 'filter=', filter);
 
     const results: SearchResult[] = res.hits.map((h: any) => ({
       ...h,

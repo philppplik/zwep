@@ -1,6 +1,7 @@
 import { MeiliSearch, type Index, type Settings } from 'meilisearch';
 import type { Document } from '@zwep/shared';
 import { loadEnv } from '@zwep/config';
+import { getEmbedProvider, resetEmbedProvider } from '@zwep/embed';
 
 /** Engine-agnostic contract so we can swap Meilisearch → Elastic later. */
 export interface IndexAdapter {
@@ -43,14 +44,42 @@ export class MeiliAdapter implements IndexAdapter {
       rankingRules: RANKING,
       typoTolerance: { enabled: true, minWordSizeForTypos: { oneTypo: 5, twoTypos: 9 } },
     };
+    // enable vector search only if an embedding provider is reachable
+    const provider = await getEmbedProvider();
+    if (provider) {
+      try {
+        const dim = await provider.dimensions();
+        (settings as any).embedders = {
+          zwep_default: {
+            source: 'userProvided',
+            dimensions: dim,
+            documentTemplate: '{{ title }} {{ excerpt }} {{ content }}',
+          },
+        };
+        console.log(`[meili] vector search enabled (${provider.name}, dim=${dim})`);
+      } catch {
+        resetEmbedProvider();
+      }
+    }
     await this.index.updateSettings(settings);
   }
 
   async upsert(docs: Document[]): Promise<void> {
     if (!docs.length) return;
-    // strip heavy `content` field from index storage? keep it searchable but
-    // it's fine for v1; Meili compresses well.
-    const task = await this.index.addDocuments(docs, { primaryKey: 'id' });
+    // attach embeddings for semantic search if a provider is available
+    const provider = await getEmbedProvider();
+    if (provider) {
+      const texts = docs.map((d) => `${d.title} ${d.excerpt} ${d.content}`.slice(0, 8000));
+      try {
+        const vectors = await provider.embed(texts);
+        docs.forEach((d, i) => {
+          (d as any)._embeddings = { zwep_default: vectors[i] };
+        });
+      } catch {
+        resetEmbedProvider();
+      }
+    }
+    const task = await this.index.addDocuments(docs as any, { primaryKey: 'id' });
     await this.index.waitForTask(task.taskUid);
   }
 

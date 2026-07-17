@@ -82,6 +82,7 @@ export interface SearchParams {
   sort?: SearchSort;
   facets?: boolean;
   highlight?: boolean;
+  semantic?: boolean;
 }
 
 /** Source definition (docs/api.md §admin/sources body + sources.yaml). */

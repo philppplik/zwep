@@ -10,6 +10,8 @@
     "@zwep/shared": "*",
     "@zwep/indexer": "*",
     "@zwep/config": "*",
+    "@zwep/graph": "*",
+    "@zwep/llm": "*",
     "fastify": "^5.2.0",
     "@fastify/cors": "^10.0.0"
   }

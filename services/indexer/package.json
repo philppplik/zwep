@@ -6,6 +6,7 @@
   "exports": { ".": "./src/index.ts" },
   "dependencies": {
     "@zwep/shared": "*",
+    "@zwep/embed": "*",
     "meilisearch": "^0.45.0"
   }
 }

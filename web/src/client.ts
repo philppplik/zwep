@@ -54,6 +54,41 @@ export async function stats(): Promise<{ ok: boolean; indexed: number }> {
   return getJson(`${BASE}/stats`);
 }
 
+export interface GraphNode {
+  id: string;
+  label: string;
+  type: string;
+  doc_count: number;
+}
+export interface GraphEdge {
+  src: string;
+  dst: string;
+  weight: number;
+  kind: string;
+}
+export interface GraphResponse {
+  ok: boolean;
+  query: string;
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  stats: { entities: number; edges: number };
+}
+
+export async function graph(q: string): Promise<GraphResponse> {
+  return getJson<GraphResponse>(`${BASE}/graph?q=${encodeURIComponent(q)}`);
+}
+
+export interface OverviewResponse {
+  ok: boolean;
+  query: string;
+  overview: string;
+  sources: { title: string; url: string; source: string }[];
+}
+
+export async function overview(q: string): Promise<OverviewResponse> {
+  return getJson<OverviewResponse>(`${BASE}/overview?q=${encodeURIComponent(q)}`);
+}
+
 // ---------- Admin ----------
 export interface CrawlTask {
   id: string;

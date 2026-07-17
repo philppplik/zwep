@@ -1,5 +1,5 @@
 import type { SearchResponse, SearchResult } from '@zwep/shared';
-import { suggest, type SuggestItem } from './client.ts';
+import { suggest, graph, overview, type SuggestItem, type GraphResponse, type OverviewResponse } from './client.ts';
 
 function debounce<T extends (...a: any[]) => void>(fn: T, ms: number): T {
   let t: ReturnType<typeof setTimeout> | undefined;
@@ -348,4 +348,163 @@ function escapeHtml(s: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+/** Render a knowledge-graph neighborhood as an interactive canvas force-graph. */
+export async function renderGraph(el: HTMLElement, query: string) {
+  el.innerHTML = `<div class="z-graph-loading">Building knowledge graph for "${escapeHtml(query)}"…</div>`;
+  let data: GraphResponse;
+  try {
+    data = await graph(query);
+  } catch (e) {
+    el.innerHTML = `<div class="z-empty">Could not load graph: ${(e as Error).message}</div>`;
+    return;
+  }
+  if (!data.nodes.length) {
+    el.innerHTML = `<div class="z-empty">No entities found for "${escapeHtml(query)}". Crawl more sources to grow the graph.</div>`;
+    return;
+  }
+  el.innerHTML = `
+    <div class="z-graph">
+      <div class="z-graph__bar">
+        <span class="z-graph__title">Knowledge Graph</span>
+        <span class="z-graph__stats">${data.nodes.length} entities · ${data.edges.length} relations · ${data.stats.entities} total in graph</span>
+      </div>
+      <canvas class="z-graph__canvas"></canvas>
+    </div>
+  `;
+  drawForceGraph(el.querySelector('canvas')!, data);
+}
+
+/** Minimal force-directed graph on canvas (no deps). */
+function drawForceGraph(canvas: HTMLCanvasElement, data: GraphResponse) {
+  const dpr = window.devicePixelRatio || 1;
+  const parent = canvas.parentElement!;
+  function resize() {
+    canvas.width = parent.clientWidth * dpr;
+    canvas.height = Math.max(360, parent.clientHeight - 60) * dpr;
+    canvas.style.width = parent.clientWidth + 'px';
+    canvas.style.height = Math.max(360, parent.clientHeight - 60) + 'px';
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  const nodes = data.nodes.map((n, i) => ({
+    ...n,
+    x: canvas.width / 2 + Math.cos((i / data.nodes.length) * Math.PI * 2) * 120 * dpr,
+    y: canvas.height / 2 + Math.sin((i / data.nodes.length) * Math.PI * 2) * 120 * dpr,
+    vx: 0,
+    vy: 0,
+  }));
+  const idMap = new Map(nodes.map((n) => [n.id, n]));
+  const edges = data.edges.filter((e) => idMap.has(e.src) && idMap.has(e.dst));
+
+  let dragNode: any = null;
+  let raf = 0;
+
+  function tick() {
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const a = nodes[i], b = nodes[j];
+        let dx = a.x - b.x, dy = a.y - b.y;
+        let d = Math.sqrt(dx * dx + dy * dy) || 1;
+        const force = (4000 * dpr * dpr) / (d * d);
+        dx /= d; dy /= d;
+        a.vx += dx * force; a.vy += dy * force;
+        b.vx -= dx * force; b.vy -= dy * force;
+      }
+    }
+    for (const e of edges) {
+      const a = idMap.get(e.src)!, b = idMap.get(e.dst)!;
+      let dx = b.x - a.x, dy = b.y - a.y;
+      const d = Math.sqrt(dx * dx + dy * dy) || 1;
+      const force = (d - 90 * dpr) * 0.02;
+      dx /= d; dy /= d;
+      a.vx += dx * force; a.vy += dy * force;
+      b.vx -= dx * force; b.vy -= dy * force;
+    }
+    for (const n of nodes) {
+      n.vx += (canvas.width / 2 - n.x) * 0.002;
+      n.vy += (canvas.height / 2 - n.y) * 0.002;
+      n.vx *= 0.85; n.vy *= 0.85;
+      if (n !== dragNode) { n.x += n.vx; n.y += n.vy; }
+    }
+    draw();
+    raf = requestAnimationFrame(tick);
+  }
+
+  function draw() {
+    const ctx = canvas.getContext('2d')!;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const edgeColor = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)';
+    const textColor = isDark ? '#e8e8ee' : '#1a1a1f';
+    ctx.strokeStyle = edgeColor;
+    ctx.lineWidth = 1 * dpr;
+    for (const e of edges) {
+      const a = idMap.get(e.src)!, b = idMap.get(e.dst)!;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+    }
+    for (const n of nodes) {
+      const r = (8 + Math.min(n.doc_count, 10)) * dpr;
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+      ctx.fillStyle = n.type === 'org' ? '#ff6600' : isDark ? '#5b9dff' : '#1f4ed8';
+      ctx.fill();
+      ctx.fillStyle = textColor;
+      ctx.font = `${12 * dpr}px Inter, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(n.label.slice(0, 18), n.x, n.y + r + 14 * dpr);
+    }
+  }
+
+  canvas.addEventListener('mousedown', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = (e.clientX - rect.left) * dpr;
+    const my = (e.clientY - rect.top) * dpr;
+    dragNode = nodes.find((n) => Math.hypot(n.x - mx, n.y - my) < (8 + Math.min(n.doc_count, 10)) * dpr + 4);
+  });
+  canvas.addEventListener('mousemove', (e) => {
+    if (!dragNode) return;
+    const rect = canvas.getBoundingClientRect();
+    dragNode.x = (e.clientX - rect.left) * dpr;
+    dragNode.y = (e.clientY - rect.top) * dpr;
+  });
+  window.addEventListener('mouseup', () => { dragNode = null; });
+
+  cancelAnimationFrame(raf);
+  tick();
+}
+
+/** AI Overview box (Google-style summary from curated results via LLM). */
+export async function renderOverview(el: HTMLElement, query: string) {
+  el.innerHTML = `<div class="z-overview z-overview--loading"><span class="z-overview__spark">✦</span> Generating overview…</div>`;
+  let data: OverviewResponse;
+  try {
+    data = await overview(query);
+  } catch {
+    el.innerHTML = '';
+    return;
+  }
+  if (!data.overview || !data.overview.trim()) {
+    el.innerHTML = '';
+    return;
+  }
+  const sources = (data.sources ?? [])
+    .map(
+      (s) =>
+        `<a class="z-overview__src" href="${encodeURI(s.url)}" target="_blank" rel="noopener">${escapeHtml(s.source || s.title)}</a>`
+    )
+    .join('');
+  el.innerHTML = `
+    <div class="z-overview">
+      <div class="z-overview__head"><span class="z-overview__spark">✦</span> Übersicht mit KI</div>
+      <div class="z-overview__body">${escapeHtml(data.overview).replace(/\n/g, '<br>')}</div>
+      ${sources ? `<div class="z-overview__sources">${sources}</div>` : ''}
+      <div class="z-overview__foot">Zusammenfassung aus kuratierten Quellen · Generative KI ist experimentell.</div>
+    </div>
+  `;
 }

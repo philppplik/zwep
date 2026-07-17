@@ -14,6 +14,7 @@
     "@zwep/config": "*",
     "@zwep/crawler": "*",
     "@zwep/extractor": "*",
-    "@zwep/indexer": "*"
+    "@zwep/indexer": "*",
+    "@zwep/graph": "*"
   }
 }

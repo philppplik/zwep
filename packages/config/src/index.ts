@@ -23,6 +23,18 @@ export const envSchema = z.object({
   CRAWLER_CONCURRENCY: z.coerce.number().default(4),
   CRAWLER_DELAY_MS: z.coerce.number().default(500),
   GOOGLE_PROXY_ENABLED: z.boolean().default(googleEnabled),
+  // Phase B: embeddings (semantic search) — both providers optional
+  EMBED_PROVIDER: z.enum(['ollama', 'openrouter', 'none']).default('none'),
+  OLLAMA_HOST: z.string().default('http://127.0.0.1:11434'),
+  OLLAMA_EMBED_MODEL: z.string().default('nomic-embed-text'),
+  OPENROUTER_API_KEY: z.string().default(''),
+  OPENROUTER_EMBED_MODEL: z.string().default('openai/text-embedding-3-small'),
+  // Phase B3: LLM for AI Overview — optional, separate from embeddings
+  LLM_PROVIDER: z.enum(['ollama', 'openrouter', 'none']).default('none'),
+  OLLAMA_LLM_MODEL: z.string().default('llama3.1'),
+  OPENROUTER_LLM_MODEL: z.string().default('openai/gpt-4o-mini'),
+  OPENROUTER_LLM_KEY: z.string().default(''),
+  GRAPH_DB: z.string().default(''),
 });
 
 export type Env = z.infer<typeof envSchema>;

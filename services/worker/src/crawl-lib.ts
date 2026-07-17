@@ -1,12 +1,17 @@
-/**
- * Shared crawl routine — used by both the CLI and the Admin API.
- * Returns a summary instead of calling process.exit, so it is embeddable.
- */
+/** Shared crawl routine — used by both the CLI and the Admin API.
+ * Returns a summary instead of calling process.exit, so it is embeddable. */
 import { getSource, loadSources } from '@zwep/config';
 import { Crawler, GoogleSourceCrawler, type CrawlPage } from '@zwep/crawler';
 import { extract } from '@zwep/extractor';
 import { Indexer } from '@zwep/indexer';
+import { KnowledgeGraph } from '@zwep/graph';
 import type { Document } from '@zwep/shared';
+
+let graph: KnowledgeGraph | null = null;
+function getGraph(): KnowledgeGraph {
+  if (!graph) graph = new KnowledgeGraph();
+  return graph;
+}
 
 export interface CrawlSummary {
   source: string;
@@ -38,6 +43,13 @@ export async function crawlSource(sourceName: string, maxPages?: number): Promis
   const onPage = async (page: CrawlPage) => {
     const doc = extract(page, source.name);
     if (doc) {
+      // Phase B: feed the knowledge graph
+      try {
+        const ents = KnowledgeGraph.extractEntities(doc.content, doc.title);
+        if (ents.length) getGraph().indexDoc(doc.id, ents);
+      } catch {
+        /* graph is best-effort */
+      }
       batch.push(doc);
       if (batch.length >= BATCH) await flush();
     }

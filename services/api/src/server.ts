@@ -3,6 +3,7 @@ import cors from '@fastify/cors';
 import { loadEnv, isGoogleProxyEnabled, loadSources, getSource, upsertSource, deleteSource, sourceSchema } from '@zwep/config';
 import { Indexer } from '@zwep/indexer';
 import { crawlSource, type CrawlSummary } from '@zwep/worker/crawl-lib.ts';
+import { getLlmProvider, applyRuntimeLlmSettings } from '@zwep/llm';
 import type { SearchSort, SourceConfig } from '@zwep/shared';
 
 const env = loadEnv();
@@ -57,8 +58,69 @@ export async function build() {
       sort,
       facets: z.facets === 'true' || z.facets === '1',
       highlight: z.highlight !== 'false',
+      semantic: z.semantic === 'true' || z.semantic === '1',
     });
     return r;
+  });
+
+  // Phase B: knowledge graph neighborhood for a query
+  let graphInst: any = null;
+  app.get('/v1/graph', async (req, reply) => {
+    const q = (req.query as any).q as string | undefined;
+    if (!q || !q.trim()) return badRequest(reply, 'invalid_query', "Parameter 'q' is required.");
+    try {
+      const { KnowledgeGraph } = await import('@zwep/graph');
+      if (!graphInst) graphInst = new KnowledgeGraph();
+      const neighborhood = graphInst.neighborhood(q.trim(), 1, 40);
+      const stats = graphInst.stats();
+      return { ok: true, query: q.trim(), ...neighborhood, stats };
+    } catch (e) {
+      return reply.code(503).send({ error: { code: 'graph_unavailable', message: (e as Error).message, status: 503 } });
+    }
+  });
+
+  // Phase B3: AI Overview — summarize top curated results via optional LLM
+  app.get('/v1/overview', async (req, reply) => {
+    const q = (req.query as any).q as string | undefined;
+    if (!q || !q.trim()) return badRequest(reply, 'invalid_query', "Parameter 'q' is required.");
+    const provider = await getLlmProvider();
+    if (!provider) {
+      return reply.code(503).send({ error: { code: 'llm_unavailable', message: 'No LLM provider configured.', status: 503 } });
+    }
+    try {
+      const top = await indexer.search({ q: q.trim(), limit: 5, highlight: false });
+      if (!top.results.length) return { ok: true, query: q.trim(), overview: '', sources: [] };
+      const context = top.results
+        .map((r, i) => `[${i + 1}] ${r.title}\n${r.excerpt}`)
+        .join('\n\n');
+      const prompt =
+        `Du bist eine Suchmaschinen-KI. Fasse die folgenden kuratierten Suchergebnisse für die Anfrage "${q.trim()}" prägnant auf Deutsch zusammen. ` +
+        `Strukturiere die Antwort mit einer einleitenden Erklärung und einer nummerierten Liste der Kernpunkte. ` +
+        `Nutze NUR Informationen aus den Quellen. Antworte ohne Einleitung wie "Hier ist eine Zusammenfassung".\n\n` +
+        `Quellen:\n${context}`;
+      const overview = await provider.complete(prompt);
+      return {
+        ok: true,
+        query: q.trim(),
+        overview,
+        sources: top.results.map((r) => ({ title: r.title, url: r.url, source: r.source })),
+      };
+    } catch (e) {
+      return reply.code(503).send({ error: { code: 'llm_error', message: (e as Error).message, status: 503 } });
+    }
+  });
+
+  // Phase B3: runtime settings push from frontend (localStorage → backend)
+  app.post('/v1/settings', async (req, reply) => {
+    const b = req.body as any;
+    if (b?.llmProvider || b?.ollamaLlmModel || b?.openrouterLlmModel || b?.openrouterLlmKey !== undefined) {
+      applyRuntimeLlmSettings({
+        llmProvider: b.llmProvider,
+        model: b.ollamaLlmModel || b.openrouterLlmModel,
+        key: b.openrouterLlmKey,
+      });
+    }
+    return { ok: true };
   });
 
   app.get('/v1/suggest', async (req, reply) => {

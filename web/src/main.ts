@@ -1,6 +1,6 @@
 import './styles/tokens.css';
 import './styles/app.css';
-import { SearchBar, ResultList } from './components.ts';
+import { SearchBar, ResultList, renderGraph, renderOverview } from './components.ts';
 import { AdminView } from './admin.ts';
 import { search, stats } from './client.ts';
 
@@ -64,7 +64,7 @@ const results = new ResultList();
 root.appendChild(results.el);
 
 // ---------- Search state ----------
-const state = { q: '', offset: 0, loading: false, type: '' as string };
+const state = { q: '', offset: 0, loading: false, type: '' as string, semantic: false };
 
 function renderHome() {
   main.className = 'z-main z-main--center';
@@ -84,6 +84,7 @@ const TABS = [
   { id: 'image', label: 'Images' },
   { id: 'video', label: 'Videos' },
   { id: 'product', label: 'Products' },
+  { id: 'graph', label: 'Graph' },
 ];
 
 function renderResultsView() {
@@ -107,12 +108,47 @@ function renderResultsView() {
   tabs.querySelectorAll<HTMLButtonElement>('.z-tab').forEach((btn) => {
     btn.addEventListener('click', () => {
       state.type = btn.dataset.type || '';
+      if (state.type === 'graph') {
+        history.replaceState(null, '', `?q=${encodeURIComponent(state.q)}&view=graph`);
+        showGraph();
+        return;
+      }
       history.replaceState(null, '', `?q=${encodeURIComponent(state.q)}${state.type ? `&type=${state.type}` : ''}`);
       doSearch();
     });
   });
   main.appendChild(tabs);
+
+  // semantic toggle (only meaningful when lexical results show)
+  const toggle = document.createElement('button');
+  toggle.className = `z-semantic-toggle${state.semantic ? ' is-on' : ''}`;
+  toggle.type = 'button';
+  toggle.textContent = state.semantic ? 'Semantic: ON' : 'Semantic: OFF';
+  toggle.title = 'Hybrid semantic search (requires an embedding provider)';
+  toggle.addEventListener('click', () => {
+    state.semantic = !state.semantic;
+    history.replaceState(null, '', `?q=${encodeURIComponent(state.q)}${state.type ? `&type=${state.type}` : ''}&semantic=${state.semantic ? 1 : 0}`);
+    doSearch();
+  });
+  main.appendChild(toggle);
+
+  // AI Overview container (filled by renderOverview if enabled)
+  const overviewBox = document.createElement('div');
+  overviewBox.id = 'z-overview';
+  overviewBox.className = 'z-overview-wrap';
+  main.appendChild(overviewBox);
+
   results.el.style.display = '';
+}
+
+async function showGraph() {
+  renderResultsView();
+  results.el.style.display = 'none';
+  main.querySelector('.z-semantic-toggle')?.remove();
+  const graphEl = document.createElement('div');
+  graphEl.className = 'z-graph-view';
+  main.appendChild(graphEl);
+  await renderGraph(graphEl, state.q);
 }
 
 const searchBar = new SearchBar(async (q) => {
@@ -127,12 +163,17 @@ async function doSearch() {
   renderResultsView();
   results.showSkeleton();
   state.loading = true;
+  const settings = loadSettings();
+  // AI Overview (parallel, only if enabled)
+  const overviewEl = document.getElementById('z-overview');
+  if (settings.overview && overviewEl) renderOverview(overviewEl, state.q);
   try {
     const resp = await search({
       q: state.q,
       facets: true,
       limit: 20,
       type: state.type ? [state.type] : undefined,
+      semantic: state.semantic || undefined,
     });
     results.render(resp, state.q);
   } catch (e) {
@@ -154,38 +195,158 @@ function clearOverlay() {
   results.el.style.display = '';
 }
 
+// ---------- Settings (persisted in localStorage) ----------
+interface ZwepSettings {
+  theme: 'light' | 'dark';
+  semantic: boolean;
+  overview: boolean;
+  llmProvider: 'ollama' | 'openrouter' | 'none';
+  ollamaModel: string;
+  openrouterModel: string;
+  openrouterKey: string;
+}
+const SETTINGS_KEY = 'zwep.settings';
+const DEFAULT_SETTINGS: ZwepSettings = {
+  theme: 'light',
+  semantic: false,
+  overview: false,
+  llmProvider: 'none',
+  ollamaModel: 'llama3.1',
+  openrouterModel: 'openai/gpt-4o-mini',
+  openrouterKey: '',
+};
+function loadSettings(): ZwepSettings {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (raw) return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+  } catch {}
+  return { ...DEFAULT_SETTINGS };
+}
+function saveSettings(s: ZwepSettings) {
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+}
+
+const OLLAMA_PRESETS = ['llama3.1', 'llama3.1:70b', 'qwen2.5', 'mistral', 'phi3'];
+const OR_PRESETS = ['openai/gpt-4o-mini', 'openai/gpt-4o', 'anthropic/claude-3.5-sonnet', 'meta-llama/llama-3.1-70b-instruct', 'google/gemini-flash-1.5'];
+
 function renderSettings() {
   clearOverlay();
   main.style.display = 'none';
   results.el.style.display = 'none';
+  const s = loadSettings();
   const wrap = document.createElement('div');
   wrap.className = 'z-overlay-page z-settings';
   wrap.appendChild(renderTopBar({ back: true, title: 'Settings' }));
-  const dark = document.documentElement.getAttribute('data-theme') === 'dark';
   const card = document.createElement('div');
   card.className = 'z-settings__card';
   card.innerHTML = `
-      <div class="z-field">
-        <span>Appearance</span>
-        <button class="z-btn" id="set-theme">Switch to ${dark ? 'light' : 'dark'}</button>
-      </div>
-      <p class="z-hint">Theme is stored in your browser (localStorage).</p>
-      <div class="z-field">
-        <span>Sources</span>
-        <a class="z-btn z-btn--primary" href="/admin" data-admin>Manage sources →</a>
-      </div>`;
+    <div class="z-field z-field--row">
+      <span>Appearance</span>
+      <button class="z-btn" id="set-theme">Switch to ${s.theme === 'dark' ? 'light' : 'dark'}</button>
+    </div>
+    <div class="z-field z-field--row">
+      <span>Semantic search <small>Hybrid vector search (needs embedding provider)</small></span>
+      <label class="z-switch"><input type="checkbox" id="set-semantic" ${s.semantic ? 'checked' : ''}><span></span></label>
+    </div>
+    <hr class="z-settings__hr" />
+    <h4 class="z-settings__h">AI Overview</h4>
+    <div class="z-field z-field--row">
+      <span>Enable AI Overview <small>Summarize curated results via LLM</small></span>
+      <label class="z-switch"><input type="checkbox" id="set-overview" ${s.overview ? 'checked' : ''}><span></span></label>
+    </div>
+    <div class="z-field">
+      <span>LLM Provider</span>
+      <select id="set-llm">
+        <option value="none" ${s.llmProvider === 'none' ? 'selected' : ''}>None (disabled)</option>
+        <option value="ollama" ${s.llmProvider === 'ollama' ? 'selected' : ''}>Ollama (local)</option>
+        <option value="openrouter" ${s.llmProvider === 'openrouter' ? 'selected' : ''}>OpenRouter (cloud)</option>
+      </select>
+    </div>
+    <div class="z-field" data-prev="ollama" style="${s.llmProvider === 'ollama' ? '' : 'display:none'}">
+      <span>Ollama Model</span>
+      <select id="set-ollama-model">${OLLAMA_PRESETS.map((m) => `<option ${m === s.ollamaModel ? 'selected' : ''}>${m}</option>`).join('')}</select>
+      <input class="z-settings__custom" id="set-ollama-custom" placeholder="Custom model…" value="${s.ollamaModel && !OLLAMA_PRESETS.includes(s.ollamaModel) ? s.ollamaModel : ''}" />
+    </div>
+    <div class="z-field" data-prev="openrouter" style="${s.llmProvider === 'openrouter' ? '' : 'display:none'}">
+      <span>OpenRouter Model</span>
+      <select id="set-or-model">${OR_PRESETS.map((m) => `<option ${m === s.openrouterModel ? 'selected' : ''}>${m}</option>`).join('')}</select>
+      <input class="z-settings__custom" id="set-or-custom" placeholder="Custom model…" value="${s.openrouterModel && !OR_PRESETS.includes(s.openrouterModel) ? s.openrouterModel : ''}" />
+      <span>OpenRouter API Key</span>
+      <input type="password" id="set-or-key" placeholder="sk-or-…" value="${s.openrouterKey}" />
+    </div>
+    <p class="z-hint">Settings are stored in your browser (localStorage). For server-wide defaults, set LLM_PROVIDER / OPENROUTER_LLM_KEY in .env.</p>
+    <div class="z-field z-field--row">
+      <span>Sources</span>
+      <a class="z-btn z-btn--primary" href="/admin" data-admin>Manage sources →</a>
+    </div>`;
   wrap.appendChild(card);
   root.appendChild(wrap);
+
+  const persist = () => {
+    const next: ZwepSettings = {
+      ...s,
+      semantic: (wrap.querySelector('#set-semantic') as HTMLInputElement).checked,
+      overview: (wrap.querySelector('#set-overview') as HTMLInputElement).checked,
+      llmProvider: (wrap.querySelector('#set-llm') as HTMLSelectElement).value as ZwepSettings['llmProvider'],
+      ollamaModel: customOrSelect(wrap, '#set-ollama-model', '#set-ollama-custom', s.ollamaModel),
+      openrouterModel: customOrSelect(wrap, '#set-or-model', '#set-or-custom', s.openrouterModel),
+      openrouterKey: (wrap.querySelector('#set-or-key') as HTMLInputElement).value,
+    };
+    saveSettings(next);
+    state.semantic = next.semantic;
+    // notify backend: if overview on, push key to .env-less runtime via localStorage only (backend reads .env)
+    syncBackendSettings(next);
+  };
+
   wrap.querySelector('#set-theme')!.addEventListener('click', () => {
-    const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    const next = s.theme === 'dark' ? 'light' : 'dark';
     applyTheme(next);
+    const upd = { ...loadSettings(), theme: next };
+    saveSettings(upd);
     renderSettings();
   });
+  wrap.querySelector('#set-semantic')!.addEventListener('change', persist);
+  wrap.querySelector('#set-overview')!.addEventListener('change', persist);
+  wrap.querySelector('#set-llm')!.addEventListener('change', () => {
+    const v = (wrap.querySelector('#set-llm') as HTMLSelectElement).value;
+    wrap.querySelectorAll('[data-prev]').forEach((el) => {
+      (el as HTMLElement).style.display = (el as HTMLElement).dataset.prev === v ? '' : 'none';
+    });
+    persist();
+  });
+  wrap.querySelector('#set-ollama-model')!.addEventListener('change', persist);
+  wrap.querySelector('#set-ollama-custom')!.addEventListener('input', persist);
+  wrap.querySelector('#set-or-model')!.addEventListener('change', persist);
+  wrap.querySelector('#set-or-custom')!.addEventListener('input', persist);
+  wrap.querySelector('#set-or-key')!.addEventListener('input', persist);
   wrap.querySelector('[data-admin]')!.addEventListener('click', (e) => {
     e.preventDefault();
     history.pushState({}, '', '/admin');
     route();
   });
+}
+
+function customOrSelect(wrap: HTMLElement, sel: string, custom: string, fallback: string): string {
+  const c = (wrap.querySelector(custom) as HTMLInputElement).value.trim();
+  if (c) return c;
+  const s = (wrap.querySelector(sel) as HTMLSelectElement).value;
+  return s || fallback;
+}
+
+/** Push user LLM settings to the backend at runtime (no restart needed). */
+async function syncBackendSettings(s: ZwepSettings) {
+  try {
+    await fetch('/v1/settings', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        llmProvider: s.llmProvider,
+        ollamaLlmModel: s.ollamaModel,
+        openrouterLlmModel: s.openrouterModel,
+        openrouterLlmKey: s.openrouterKey,
+      }),
+    });
+  } catch {}
 }
 
 function route() {
@@ -221,7 +382,17 @@ function route() {
 
 route();
 
-// SPA-style nav for footer links
+// apply persisted settings on boot
+(function applyBootSettings() {
+  const s = loadSettings();
+  applyTheme(s.theme);
+  state.semantic = s.semantic;
+  if (s.llmProvider !== 'none') {
+    // push to backend so AI Overview works without .env restart
+    syncBackendSettings(s);
+  }
+})();
+
 footer.querySelector('#nav-admin')!.addEventListener('click', (e) => {
   e.preventDefault();
   history.pushState({}, '', '/admin');
