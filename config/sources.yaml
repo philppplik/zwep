@@ -24,3 +24,15 @@ sources:
     schedule: "0 0 * * *"   # daily
     maxDepth: 2
     maxPages: 50
+
+  # Google als Proxy: definierte Queries → Google-Suchergebnisse → jene Seiten crawlen.
+  # Fragil (Google kann blocken / Interstitials zeigen). Best-effort, keine Folgelinks.
+  - name: google
+    type: google
+    queries:
+      - "Gogure Media Verlag"
+      - "self-hosted search engine curated"
+      - "Meilisearch tutorial"
+    allowedDomains: []        # leer = alle Treffer erlaubt (von Google geliefert)
+    maxDepth: 0
+    maxPages: 30

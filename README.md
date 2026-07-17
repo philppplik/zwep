@@ -84,6 +84,28 @@ curl "http://localhost:8080/v1/search?q=klimapolitik&source=gogure"
 
 ---
 
+## Sources
+
+Sources are curated (never a general web crawler). Two kinds:
+
+- **`web`** (default) — seed URLs + `allowedDomains`; the crawler stays inside
+  the whitelist, honours `robots.txt` + crawl-delay, dedups by canonical URL.
+- **`google`** — a list of `queries` is run against Google; the organic result
+  URLs are then crawled with the web crawler (no further link-following).
+
+Manage sources via the admin console (`/admin`) or the admin API
+(`/v1/admin/sources`). Defaults are seeded from [`config/sources.yaml`](config/sources.yaml)
+into a writable store at `data/sources.json`.
+
+> **Note on the Google source (fragile by design).** Google serves a
+> JavaScript-only shell to non-browser clients and rate-limits datacenter IPs,
+> so a plain HTTP fetch often returns **zero** organic links. The source is
+> built to degrade gracefully (it reports `indexed: 0` instead of crashing) and
+> will pick up results when run from an IP / setup Google doesn't block. For
+> reliable results, put a search API or residential proxy behind it.
+
+---
+
 ## Documentation
 
 | Doc | What's inside |

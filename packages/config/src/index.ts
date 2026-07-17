@@ -32,8 +32,10 @@ export function loadEnv(): Env {
 
 export const sourceSchema = z.object({
   name: z.string().min(1).max(64),
-  seeds: z.array(z.string().url()),
-  allowedDomains: z.array(z.string().min(1)),
+  type: z.enum(['web', 'google']).optional(),
+  seeds: z.array(z.string().url()).default([]),
+  queries: z.array(z.string().min(1)).optional(),
+  allowedDomains: z.array(z.string().min(1)).default([]),
   sitemap: z.string().url().optional(),
   schedule: z.string().optional(),
   maxDepth: z.number().int().min(0).max(10).optional(),

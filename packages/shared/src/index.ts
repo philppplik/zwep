@@ -85,7 +85,9 @@ export interface SearchParams {
 /** Source definition (docs/api.md §admin/sources body + sources.yaml). */
 export interface SourceConfig {
   name: string;
+  type?: 'web' | 'google';
   seeds: string[];
+  queries?: string[];      // for type: 'google' — search Google for these queries
   allowedDomains: string[];
   sitemap?: string;
   schedule?: string;

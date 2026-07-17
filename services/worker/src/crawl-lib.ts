@@ -3,7 +3,7 @@
  * Returns a summary instead of calling process.exit, so it is embeddable.
  */
 import { getSource, loadSources } from '@zwep/config';
-import { Crawler, type CrawlPage } from '@zwep/crawler';
+import { Crawler, GoogleSourceCrawler, type CrawlPage } from '@zwep/crawler';
 import { extract } from '@zwep/extractor';
 import { Indexer } from '@zwep/indexer';
 import type { Document } from '@zwep/shared';
@@ -43,7 +43,10 @@ export async function crawlSource(sourceName: string, maxPages?: number): Promis
     }
   };
 
-  const crawler = new Crawler(source, onPage);
+  const crawler =
+    source.type === 'google'
+      ? new GoogleSourceCrawler(source, onPage)
+      : new Crawler(source, onPage);
   const stats = await crawler.run(maxPages ?? source.maxPages ?? 1000);
   await flush();
 
