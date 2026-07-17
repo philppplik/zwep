@@ -33,6 +33,10 @@
   --z-text-secondary: var(--z-gray-500);
   --z-text-tertiary: var(--z-gray-400);
 
+  /* Link colors (theme-aware, high contrast) */
+  --z-link: #1f4ed8;
+  --z-link-visited: #6d28d9;
+
   /* Typography */
   --z-font-sans: "LINE Seed JP", "Inter", -apple-system, BlinkMacSystemFont,
     "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -94,6 +98,10 @@
   --z-text: #f7f7f8;
   --z-text-secondary: #9b9bab;
   --z-text-tertiary: #6e6e80;
+
+  /* Link colors (theme-aware, high contrast) */
+  --z-link: #93c5fd;
+  --z-link-visited: #c4b5fd;
 
   --z-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   --z-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);

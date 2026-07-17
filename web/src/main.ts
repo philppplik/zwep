@@ -67,7 +67,7 @@ root.appendChild(results.el);
 const state = { q: '', offset: 0, loading: false };
 
 function renderHome() {
-  main.className = 'z-main';
+  main.className = 'z-main z-main--center';
   main.innerHTML = `
     <div class="z-hero">
       <img class="z-hero__logo" src="/zwep-logo.png" alt="Zwep" />

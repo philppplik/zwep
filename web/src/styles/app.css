@@ -45,8 +45,7 @@
   gap: var(--z-space-4);
   padding: var(--z-space-3) var(--z-space-5);
   border-top: 1px solid var(--z-border);
-  background: color-mix(in srgb, var(--z-bg) 90%, transparent);
-  backdrop-filter: saturate(180%) blur(12px);
+  background: var(--z-bg-elevated);
   font-size: var(--z-text-xs);
 }
 .z-footer__tag {
@@ -114,6 +113,15 @@
   max-width: var(--z-content-max);
   margin: 0 auto;
   padding: var(--z-space-16) var(--z-space-5) var(--z-space-10);
+}
+.z-main--center {
+  min-height: calc(100vh - var(--z-header-h) - 49px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding-top: 0;
+  padding-bottom: var(--z-space-16);
 }
 .z-home {
   display: flex;
@@ -557,9 +565,11 @@
   margin-top: var(--z-space-2);
 }
 
-/* ---------- Quality badge ---------- */
+/* ---------- Quality badge + info popover ---------- */
 .z-quality {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
   min-width: 22px;
   text-align: center;
   font-size: 10px;
@@ -568,7 +578,7 @@
   padding: 0 4px;
   margin-left: var(--z-space-1);
   vertical-align: middle;
-  opacity: 0.8;
+  opacity: 0.85;
 }
 .z-quality--high {
   background: rgba(16, 163, 127, 0.15);
@@ -581,6 +591,63 @@
 .z-quality--low {
   background: rgba(150, 150, 160, 0.16);
   color: var(--z-text-secondary);
+}
+.z-quality__info {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1;
+  padding: 0 1px;
+  opacity: 0.7;
+}
+.z-quality__info:hover {
+  opacity: 1;
+}
+.z-quality__pop {
+  position: absolute;
+  z-index: 50;
+  display: none;
+  width: 260px;
+  margin-top: 6px;
+  padding: var(--z-space-3) var(--z-space-4);
+  background: var(--z-bg-elevated);
+  border: 1px solid var(--z-border);
+  border-radius: var(--z-radius-md);
+  box-shadow: var(--z-shadow-lg);
+  font-size: var(--z-text-xs);
+  font-weight: 400;
+  color: var(--z-text-secondary);
+  line-height: 1.5;
+  text-align: left;
+}
+.z-quality__pop.is-open {
+  display: block;
+}
+.z-quality__pop strong {
+  display: block;
+  color: var(--z-text);
+  font-size: var(--z-text-sm);
+  margin-bottom: var(--z-space-1);
+}
+.z-quality__pop ul {
+  margin: var(--z-space-2) 0;
+  padding-left: var(--z-space-4);
+}
+.z-quality__pop li {
+  margin-bottom: 2px;
+}
+
+/* ---------- Results title (theme-contrast, not Google blue) ---------- */
+.z-result__title a {
+  color: var(--z-link);
+}
+.z-result__title a:visited {
+  color: var(--z-link-visited);
+}
+.z-result__title a:hover {
+  text-decoration: underline;
 }
 
 /* ---------- Top bar (shared nav across views) ---------- */

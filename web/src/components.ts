@@ -148,6 +148,19 @@ export class ResultList {
       ${facets}
       ${resp.results.map((r, i) => resultHtml(r, i)).join('')}
     `;
+    // quality info popovers (toggle on click, close others)
+    this.el.querySelectorAll<HTMLButtonElement>('[data-qinfo]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const pop = btn.parentElement!.querySelector('.z-quality__pop') as HTMLElement;
+        const open = pop.classList.contains('is-open');
+        this.el.querySelectorAll('.z-quality__pop.is-open').forEach((p) => p.classList.remove('is-open'));
+        if (!open) pop.classList.add('is-open');
+      });
+    });
+    document.addEventListener('click', () => {
+      this.el.querySelectorAll('.z-quality__pop.is-open').forEach((p) => p.classList.remove('is-open'));
+    }, { once: true });
   }
 
   showSkeleton(count = 6) {
@@ -194,7 +207,21 @@ function resultHtml(r: SearchResult, i: number): string {
     .join('');
   const q = r.quality;
   const qBadge = q
-    ? `<span class="z-quality z-quality--${qualityBand(q.score)}" title="Quality ${Math.round(q.score * 100)}%">${Math.round(q.score * 100)}</span>`
+    ? `<span class="z-quality z-quality--${qualityBand(q.score)}" title="Quality ${Math.round(q.score * 100)}%">
+        ${Math.round(q.score * 100)}
+        <button class="z-quality__info" type="button" aria-label="What is the quality index?" data-qinfo>ⓘ</button>
+        <span class="z-quality__pop" role="tooltip">
+          <strong>Quality Index</strong>
+          <span>Zwep scores each result 0–100 from four signals:</span>
+          <ul>
+            <li><b>Length</b> ${Math.round(q.length * 100)}% — content depth</li>
+            <li><b>Freshness</b> ${Math.round(q.freshness * 100)}% — how recent</li>
+            <li><b>Title</b> ${Math.round(q.title * 100)}% — title quality</li>
+            <li><b>Structure</b> ${Math.round(q.structure * 100)}% — page structure</li>
+          </ul>
+          <span>Higher = more useful. Sorting by quality surfaces the best curated pages first.</span>
+        </span>
+      </span>`
     : '';
   return `
     <article class="z-result" style="animation-delay:${Math.min(i * 20, 200)}ms">
