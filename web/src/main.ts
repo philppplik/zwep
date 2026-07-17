@@ -82,8 +82,7 @@ function renderHome() {
 function renderResultsView() {
   main.className = 'z-main';
   main.innerHTML = '';
-  main.appendChild(searchBar.el);
-  // logo + brand mark above the results list
+  // logo above the search input bar (Google-style: brand sits on top)
   const brand = document.createElement('div');
   brand.className = 'z-results__brand';
   brand.innerHTML = `
@@ -91,6 +90,7 @@ function renderResultsView() {
     <span>Zwep</span>
   `;
   main.appendChild(brand);
+  main.appendChild(searchBar.el);
   results.el.style.display = '';
 }
 
