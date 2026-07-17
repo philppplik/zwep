@@ -501,6 +501,31 @@
 .z-admin__toast.is-error {
   background: #c0392b;
 }
+.z-admin__bulk {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--z-space-2);
+  margin-top: var(--z-space-3);
+}
+.z-admin__query {
+  display: flex;
+  gap: var(--z-space-2);
+  margin-top: var(--z-space-3);
+}
+.z-admin__query input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--z-border);
+  border-radius: var(--z-radius-md);
+  font-family: inherit;
+  font-size: var(--z-text-sm);
+  background: var(--z-bg-elevated);
+  color: var(--z-text);
+}
+.z-admin__query input:focus {
+  outline: none;
+  border-color: var(--z-accent);
+}
 
 /* ---------- Modal ---------- */
 .z-modal__overlay {

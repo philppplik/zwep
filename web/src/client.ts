@@ -1,4 +1,4 @@
-import type { SearchResponse, SearchResult, SearchParams } from '@zwep/shared';
+import type { SearchResponse, SearchResult, SearchParams, SourceConfig } from '@zwep/shared';
 
 const BASE = '/v1';
 
@@ -169,6 +169,47 @@ export async function adminCrawl(adminKey: string, source: string, maxPages?: nu
 export async function adminCrawlStatus(adminKey: string, taskId: string): Promise<CrawlTask> {
   const r = await getJson<{ task: CrawlTask }>(`${BASE}/admin/crawl/${encodeURIComponent(taskId)}?admin_key=${encodeURIComponent(adminKey)}`);
   return r.task;
+}
+
+export async function adminCrawlAll(adminKey: string, maxPages?: number): Promise<{ ok: boolean; batchId: string; count: number }> {
+  const res = await fetch(`${BASE}/admin/crawl-all?admin_key=${encodeURIComponent(adminKey)}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ maxPages }),
+  });
+  if (!res.ok) {
+    const b = await res.json().catch(() => ({}));
+    throw new Error(b?.error?.message || `Crawl-all failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function adminCrawlUrl(adminKey: string, url: string): Promise<{ ok: boolean; taskId: string; source: string }> {
+  const res = await fetch(`${BASE}/admin/crawl-url?admin_key=${encodeURIComponent(adminKey)}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ url }),
+  });
+  if (!res.ok) {
+    const b = await res.json().catch(() => ({}));
+    throw new Error(b?.error?.message || `Crawl-URL failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function adminDeindexAll(adminKey: string): Promise<{ ok: boolean; message: string }> {
+  const res = await fetch(`${BASE}/admin/deindex-all?admin_key=${encodeURIComponent(adminKey)}`, {
+    method: 'POST',
+  });
+  if (!res.ok) {
+    const b = await res.json().catch(() => ({}));
+    throw new Error(b?.error?.message || `Deindex failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function adminCrawlAllStatus(adminKey: string, batchId: string): Promise<{ batch: CrawlTask[] }> {
+  return getJson<{ batch: CrawlTask[] }>(`${BASE}/admin/crawl-all/${encodeURIComponent(batchId)}?admin_key=${encodeURIComponent(adminKey)}`);
 }
 
 export interface AdminConfig {

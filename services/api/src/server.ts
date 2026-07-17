@@ -298,11 +298,96 @@ export async function build() {
     return reply.code(202).send({ ok: true, taskId: id });
   });
 
-  // poll crawl task status
-  app.get<{ Params: { id: string } }>('/v1/admin/crawl/:id', { preHandler: requireAdmin }, async (req, reply) => {
-    const task = tasks.get((req.params as any).id);
-    if (!task) return reply.code(404).send({ error: { code: 'not_found', message: 'Task not found', status: 404 } });
-    return { task };
+  // trigger a crawl of ALL enabled sources (async; returns a batch id)
+  app.post('/v1/admin/crawl-all', { preHandler: requireAdmin }, async (req, reply) => {
+    const body = (req.body as any) ?? {};
+    const maxPages = body.maxPages ? Number(body.maxPages) : undefined;
+    const sources = loadSources().filter((s) => s.enabled !== false);
+    if (!sources.length) {
+      return reply.code(400).send({ error: { code: 'no_sources', message: 'No enabled sources to crawl', status: 400 } });
+    }
+    const id = `batch_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const batch: CrawlTask[] = sources.map((s) => ({
+      id: `${id}_${s.name}`,
+      source: s.name,
+      status: 'running',
+      startedAt: new Date().toISOString(),
+    }));
+    batch.forEach((t) => tasks.set(t.id, t));
+    // run sequentially (avoid overloading Meili)
+    (async () => {
+      for (const t of batch) {
+        try {
+          const summary = await crawlSource(t.source, maxPages);
+          t.status = 'done';
+          t.summary = summary;
+        } catch (e) {
+          t.status = 'error';
+          t.error = e instanceof Error ? e.message : String(e);
+        }
+        t.finishedAt = new Date().toISOString();
+      }
+    })();
+    return reply.code(202).send({ ok: true, batchId: id, count: sources.length });
+  });
+
+  // deindex ALL documents (keeps sources, clears the index)
+  app.post('/v1/admin/deindex-all', { preHandler: requireAdmin }, async (req, reply) => {
+    try {
+      const { getAdapter } = await import('@zwep/indexer');
+      await (getAdapter() as any).index.deleteAllDocuments();
+      return { ok: true, message: 'All documents deleted from index.' };
+    } catch (e) {
+      return reply.code(500).send({ error: { code: 'deindex_failed', message: (e as Error).message, status: 500 } });
+    }
+  });
+
+  // ad-hoc crawl a single URL (crawl query) — creates a temporary source
+  app.post('/v1/admin/crawl-url', { preHandler: requireAdmin }, async (req, reply) => {
+    const body = (req.body as any) ?? {};
+    const url = body.url;
+    if (!url || !/^https?:\/\//.test(url)) {
+      return reply.code(400).send({ error: { code: 'invalid_url', message: 'A valid http(s) URL is required', status: 400 } });
+    }
+    let domain = '';
+    try {
+      domain = new URL(url).hostname.replace(/^www\./, '');
+    } catch {
+      return reply.code(400).send({ error: { code: 'invalid_url', message: 'Malformed URL', status: 400 } });
+    }
+    const name = `url_${domain}_${Date.now()}`;
+    const src: SourceConfig = {
+      name,
+      type: 'web',
+      seeds: [url],
+      allowedDomains: [domain],
+      maxPages: 1,
+    };
+    // save as a source so it can be toggled / re-crawled later
+    upsertSource(src);
+    const taskId = `task_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const task: CrawlTask = { id: taskId, source: name, status: 'running', startedAt: new Date().toISOString() };
+    tasks.set(taskId, task);
+    crawlSource(name, 1)
+      .then((summary) => {
+        task.status = 'done';
+        task.summary = summary;
+        task.finishedAt = new Date().toISOString();
+      })
+      .catch((e) => {
+        task.status = 'error';
+        task.error = e instanceof Error ? e.message : String(e);
+        task.finishedAt = new Date().toISOString();
+      });
+    return reply.code(202).send({ ok: true, taskId, source: name });
+  });
+
+  // poll batch status
+  app.get('/v1/admin/crawl-all/:id', { preHandler: requireAdmin }, async (req, reply) => {
+    const id = (req.params as any).id;
+    const batch = Array.from(tasks.values()).filter((t) => t.id.startsWith(id));
+    if (!batch.length) return reply.code(404).send({ error: { code: 'not_found', message: 'Batch not found', status: 404 } });
+    return { batch };
   });
 
   return app;

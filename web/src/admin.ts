@@ -62,15 +62,28 @@ export class AdminView {
     this.el.innerHTML = `
       <div class="z-admin__head">
         <h2 class="z-admin__title">Sources</h2>
-        <div class="z-admin__actions">
-          <button class="z-btn z-btn--primary" id="add-source">+ New source</button>
-        </div>
+      </div>
+      <div class="z-admin__bulk">
+        <button class="z-btn z-btn--primary" id="bulk-crawl-all">⚡ Crawl all enabled</button>
+        <button class="z-btn" id="bulk-deindex">🗑 Deindex all</button>
+        <button class="z-btn z-btn--sm" id="add-source">+ New source</button>
+      </div>
+      <div class="z-admin__query">
+        <input id="crawl-url-input" placeholder="https://example.com/article — crawl any URL…" />
+        <button class="z-btn z-btn--primary" id="crawl-url-btn">Crawl URL</button>
       </div>
       ${gpBanner}
       <div class="z-admin__body"></div>
       <div class="z-admin__toast" id="admin-toast" hidden></div>
     `;
+    this.el.querySelector('#bulk-crawl-all')!.addEventListener('click', () => this.crawlAll());
+    this.el.querySelector('#bulk-deindex')!.addEventListener('click', () => this.deindexAll());
     this.el.querySelector('#add-source')!.addEventListener('click', () => this.openEditor(null));
+    this.el.querySelector('#crawl-url-btn')!.addEventListener('click', () => {
+      const input = this.el.querySelector('#crawl-url-input') as HTMLInputElement;
+      this.crawlUrl(input.value.trim());
+      input.value = '';
+    });
   }
 
   private renderTable() {
@@ -149,6 +162,66 @@ export class AdminView {
     } catch (e) {
       this.toast((e as Error).message, true);
     }
+  }
+
+  private async crawlAll() {
+    const enabled = this.sources.filter((s) => s.enabled !== false);
+    if (!enabled.length) {
+      this.toast('No enabled sources to crawl.', true);
+      return;
+    }
+    if (!confirm(`Crawl all ${enabled.length} enabled sources? This runs in the background.`)) return;
+    try {
+      const { batchId } = await adminCrawlAll(ADMIN_KEY);
+      this.toast(`Crawling ${enabled.length} sources in background…`);
+      this.pollBatch(batchId);
+    } catch (e) {
+      this.toast((e as Error).message, true);
+    }
+  }
+
+  private async deindexAll() {
+    if (!confirm('Delete ALL indexed documents? Sources are kept, but the index is cleared.')) return;
+    try {
+      const r = await adminDeindexAll(ADMIN_KEY);
+      this.toast(r.message);
+      await this.load();
+    } catch (e) {
+      this.toast((e as Error).message, true);
+    }
+  }
+
+  private async crawlUrl(url: string) {
+    if (!url) return;
+    try {
+      const { taskId, source } = await adminCrawlUrl(ADMIN_KEY, url);
+      this.toast(`Crawling ${url} → source "${source}"`);
+      this.pollTask(taskId);
+      await this.load();
+    } catch (e) {
+      this.toast((e as Error).message, true);
+    }
+  }
+
+  private pollBatch(batchId: string) {
+    const tick = async () => {
+      try {
+        const { batch } = await adminCrawlAllStatus(ADMIN_KEY, batchId);
+        const done = batch.filter((t) => t.status === 'done' || t.status === 'error').length;
+        this.toast(`Batch progress: ${done}/${batch.length} sources done…`);
+        if (done === batch.length) {
+          if (this.pollTimer) clearInterval(this.pollTimer);
+          const failed = batch.filter((t) => t.status === 'error').length;
+          this.toast(failed ? `Batch done — ${failed} failed` : `Batch complete: all ${batch.length} sources crawled`);
+          await this.load();
+        }
+      } catch {
+        /* keep polling */
+      }
+    };
+    if (this.pollTimer) clearInterval(this.pollTimer);
+    tick();
+    this.pollTimer = setInterval(tick, 3000);
   }
 
   private pollTask(taskId: string) {
