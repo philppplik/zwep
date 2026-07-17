@@ -134,12 +134,13 @@ export class ResultList {
     this.el.className = 'z-results';
   }
 
-  render(resp: SearchResponse, query: string) {
+  render(resp: SearchResponse, query: string, clientMs?: number) {
     if (!resp.results.length) {
       this.el.innerHTML = `<div class="z-empty">No results for “${escapeHtml(query)}”.</div>`;
       return;
     }
-    const meta = `${resp.total} result${resp.total === 1 ? '' : 's'} · ${resp.took_ms} ms`;
+    const clientStr = clientMs != null ? ` · ${clientMs} ms client` : '';
+    const meta = `${resp.total} result${resp.total === 1 ? '' : 's'} · ${resp.took_ms} ms server${clientStr}`;
     const facets = resp.facets
       ? `<div class="z-facets">${facetChips(resp.facets)}</div>`
       : '';

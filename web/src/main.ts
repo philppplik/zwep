@@ -164,6 +164,7 @@ async function doSearch() {
   const overviewEl = document.getElementById('z-overview');
   if (settings.overview && overviewEl) renderOverview(overviewEl, state.q);
   try {
+    const t0 = performance.now();
     const resp = await search({
       q: state.q,
       facets: true,
@@ -172,7 +173,9 @@ async function doSearch() {
       semantic: state.semantic || undefined,
       fuzzy: state.fuzzy,
     });
-    results.render(resp, state.q);
+    const ms = Math.round(performance.now() - t0);
+    (window as any).__lastSearchMs = ms;
+    results.render(resp, state.q, ms);
   } catch (e) {
     const err = e as Error;
     const isNet = err.message.includes('fetch') || err.message.includes('Failed to fetch') || err.message.includes('Network');

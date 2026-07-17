@@ -65,6 +65,8 @@ export class AdminView {
       </div>
       <div class="z-admin__bulk">
         <button class="z-btn z-btn--primary" id="bulk-crawl-all">⚡ Crawl all enabled</button>
+        <button class="z-btn" id="bulk-activate">✓ Activate all</button>
+        <button class="z-btn" id="bulk-deactivate">✗ Deactivate all</button>
         <button class="z-btn" id="bulk-deindex">🗑 Deindex all</button>
         <button class="z-btn z-btn--sm" id="add-source">+ New source</button>
       </div>
@@ -77,6 +79,8 @@ export class AdminView {
       <div class="z-admin__toast" id="admin-toast" hidden></div>
     `;
     this.el.querySelector('#bulk-crawl-all')!.addEventListener('click', () => this.crawlAll());
+    this.el.querySelector('#bulk-activate')!.addEventListener('click', () => this.setAllEnabled(true));
+    this.el.querySelector('#bulk-deactivate')!.addEventListener('click', () => this.setAllEnabled(false));
     this.el.querySelector('#bulk-deindex')!.addEventListener('click', () => this.deindexAll());
     this.el.querySelector('#add-source')!.addEventListener('click', () => this.openEditor(null));
     this.el.querySelector('#crawl-url-btn')!.addEventListener('click', () => {
@@ -162,6 +166,30 @@ export class AdminView {
     } catch (e) {
       this.toast((e as Error).message, true);
     }
+  }
+
+  private async setAllEnabled(enabled: boolean) {
+    if (!this.sources.length) return;
+    const targets = this.sources.filter((s) => (s.enabled !== false) !== enabled);
+    if (!targets.length) {
+      this.toast(`All sources already ${enabled ? 'active' : 'inactive'}.`);
+      return;
+    }
+    this.toast(`Setting ${targets.length} sources ${enabled ? 'active' : 'inactive'}…`);
+    let ok = 0;
+    let fail = 0;
+    await Promise.all(
+      targets.map(async (s) => {
+        try {
+          await adminUpsertSource(ADMIN_KEY, { ...s, enabled });
+          ok++;
+        } catch {
+          fail++;
+        }
+      })
+    );
+    this.toast(fail ? `${ok} updated, ${fail} failed` : `${ok} sources ${enabled ? 'activated' : 'deactivated'}`);
+    await this.load();
   }
 
   private async crawlAll() {
