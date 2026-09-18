@@ -183,26 +183,46 @@ async function safeText(res: Response): Promise<string> {
 
 let provider: LlmProvider | null = null;
 let disabledUntil = 0;
-let runtimeOverride: { provider?: string; model?: string; key?: string } | null = null;
+/** The only provider names this module will ever hold. */
+export const LLM_PROVIDERS = ['none', 'ollama', 'openrouter'] as const;
+export type LlmProviderName = (typeof LLM_PROVIDERS)[number];
+
+export function isLlmProviderName(v: unknown): v is LlmProviderName {
+  return typeof v === 'string' && (LLM_PROVIDERS as readonly string[]).includes(v);
+}
+
+let runtimeOverride: { provider?: LlmProviderName; model?: string; key?: string } | null = null;
 
 export function resetLlmProvider(): void {
   provider = null;
   disabledUntil = 0;
 }
 
-/** Apply runtime LLM settings pushed from the admin UI (no restart needed). */
+/**
+ * Apply runtime LLM settings pushed from the admin UI (no restart needed).
+ *
+ * The provider name is validated here rather than trusted from the caller. The
+ * API route validates too, but this module logs the name, so it must not
+ * depend on a check that lives in a different file to know the value is one of
+ * three literals.
+ */
 export function applyRuntimeLlmSettings(opts: {
   llmProvider?: string;
   model?: string;
   key?: string;
 }): void {
-  runtimeOverride = { provider: opts.llmProvider, model: opts.model, key: opts.key };
+  runtimeOverride = {
+    provider: isLlmProviderName(opts.llmProvider) ? opts.llmProvider : undefined,
+    model: opts.model,
+    key: opts.key,
+  };
   resetLlmProvider();
 }
 
 /** The provider name currently in effect (env default or runtime override). */
-export function activeProviderName(): string {
-  return runtimeOverride?.provider ?? loadEnv().LLM_PROVIDER;
+export function activeProviderName(): LlmProviderName {
+  const fromEnv = loadEnv().LLM_PROVIDER;
+  return runtimeOverride?.provider ?? (isLlmProviderName(fromEnv) ? fromEnv : 'none');
 }
 
 /**
@@ -217,8 +237,8 @@ export async function getLlmProvider(): Promise<LlmProvider | null> {
   if (Date.now() < disabledUntil) return null;
 
   const env = loadEnv();
-  const providerName = runtimeOverride?.provider ?? env.LLM_PROVIDER;
-  if (!providerName || providerName === 'none') return null;
+  const providerName = activeProviderName();
+  if (providerName === 'none') return null;
 
   const model =
     runtimeOverride?.model ??
@@ -234,7 +254,7 @@ export async function getLlmProvider(): Promise<LlmProvider | null> {
   } catch (e) {
     disabledUntil = Date.now() + RETRY_AFTER_MS;
     console.warn(
-      `[llm] provider '${oneLine(providerName, 40)}' unavailable: ${oneLine((e as Error).message)}. ` +
+      `[llm] provider '${providerName}' unavailable: ${oneLine((e as Error).message)}. ` +
         `AI Overview paused for ${RETRY_AFTER_MS / 1000}s.`,
     );
     return null;

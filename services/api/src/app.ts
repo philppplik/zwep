@@ -20,6 +20,8 @@ import {
   applyRuntimeLlmSettings,
   activeProviderName,
   overviewPrompt,
+  isLlmProviderName,
+  LLM_PROVIDERS,
 } from '@zwep/llm';
 import type { SearchSort, SourceConfig } from '@zwep/shared';
 import { TaskRegistry } from './tasks.ts';
@@ -272,8 +274,15 @@ export async function build(opts: BuildOptions = {}): Promise<FastifyInstance> {
   app.post('/v1/settings', admin, async (req, reply) => {
     const b = (req.body ?? {}) as Record<string, unknown>;
     const provider = typeof b.llmProvider === 'string' ? b.llmProvider : undefined;
-    if (provider && !['ollama', 'openrouter', 'none'].includes(provider)) {
-      return fail(reply, 400, 'invalid', `Unknown llmProvider: ${provider}`);
+    // The LLM module validates this too, and is the authority. Checking here as
+    // well is what turns a silently-ignored typo into a 400 the caller can see.
+    if (provider !== undefined && !isLlmProviderName(provider)) {
+      return fail(
+        reply,
+        400,
+        'invalid',
+        `Unknown llmProvider. Expected one of: ${LLM_PROVIDERS.join(', ')}`,
+      );
     }
     applyRuntimeLlmSettings({
       llmProvider: provider,
