@@ -1,139 +1,91 @@
-# Zwep — Backend
+# Zwep backend
 
-> Production-grade, self-hosted mini search engine. Crawls a curated set of
-> sources, extracts clean documents, indexes them in Meilisearch, and serves
-> fast, faceted, typo-tolerant search through a small Fastify API.
->
-> Status: **Phase 1 — vertical slice working** (crawl → extract → index →
-> search verified end-to-end with live data).
+The crawl → extract → index → search pipeline, plus the HTTP API that serves it.
 
----
+For the reasoning behind the structure, see
+[`../docs/architecture.md`](../docs/architecture.md). This file is the map.
 
-## Architecture
+## Data flow
 
 ```
-config/sources.yaml          # crawl seeds (curated sources)
-        │
-   @zwep/crawler    ──  BFS crawl, robots.txt + crawl-delay, JS render via Playwright
-        │  CrawlPage (html)
-   @zwep/extractor  ──  Readability + metadata + language + content hash
+config/sources.yaml ──seeds once──▶ data/sources.json
+                                           │
+   @zwep/crawler       BFS crawl, robots.txt + crawl-delay, per-host politeness,
+        │              fetch timeout and size cap, Playwright only when needed
+        │  CrawlPage (raw HTML)
+        ▼
+   @zwep/extractor     Readability + JSON-LD + Open Graph, language and date
+        │              normalization; returns null for navigation-only pages
         │  Document
-   @zwep/indexer    ──  IndexAdapter (Meilisearch) — engine-agnostic
-        │  upsert
-   Meilisearch  ◄───  index "zwep_documents"
-        │  search
-   @zwep/api        ──  Fastify: /v1/search /suggest /document /stats /healthz
+        ├──▶ @zwep/quality   0–1 composite from depth, freshness, title, structure
+        ├──▶ @zwep/graph     entities + co-mention edges → SQLite
+        ▼
+   @zwep/indexer       Meilisearch behind IndexAdapter; optional vectors
         │
-   clients (cust*m Tab, web UI, …)   ← never talk to Meili directly
+        ▼
+   @zwep/api           Fastify on :8080
 ```
 
-Packages (npm workspaces):
+## Packages
 
 | Package | Responsibility |
-|---|---|
-| `@zwep/shared` | `Document`, `SearchParams`, `SearchResult` contracts (mirror `docs/api.md`) |
-| `@zwep/config` | env schema (zod) + `sources.yaml` loader |
-| `@zwep/crawler` | politeness-aware BFS crawler, Playwright render fallback |
-| `@zwep/extractor` | Readability text extraction + metadata |
-| `@zwep/indexer` | `IndexAdapter` interface + Meilisearch implementation |
-| `@zwep/api` | Fastify HTTP service |
-| `@zwep/worker` | CLI: `zwep crawl <source> [maxPages]` |
+| --- | --- |
+| `@zwep/shared` | Types only. **This is the API contract.** |
+| `@zwep/config` | Env schema, `.env` loading, the source store |
+| `@zwep/quality` | Document quality scoring (pure, injectable clock) |
+| `@zwep/crawler` | Fetching, robots.txt, sitemaps, URL canonicalization |
+| `@zwep/extractor` | HTML → `Document` |
+| `@zwep/indexer` | `IndexAdapter` + the Meilisearch implementation |
+| `@zwep/embed` | Optional embedding providers (Ollama, OpenRouter) |
+| `@zwep/llm` | Optional LLM providers, prompt, and the overview cache |
+| `@zwep/graph` | SQLite knowledge graph |
+| `@zwep/worker` | `crawlSource` orchestration and the crawl CLI |
+| `@zwep/api` | HTTP routes, auth, rate limiting, task registry |
 
----
+Packages refer to each other by workspace name, never by a relative path across
+a package boundary.
 
-## Prerequisites
-
-- **Node.js ≥ 20** (tested on 24, uses native TS strip — no build step)
-- **Docker + Docker Compose** (for Meilisearch + Redis)
-- **Playwright Chromium** (for JS-heavy pages):
-  `npx playwright install chromium`
-
----
-
-## Quickstart
+## Running it
 
 ```bash
-# 1. install workspace deps
-npm install
-npx playwright install chromium
-
-# 2. start Meilisearch + Redis
-cp .env.example .env
-docker compose up -d meilisearch redis
-
-# 3. crawl a source (see config/sources.yaml)
-node --experimental-strip-types services/worker/src/cli.ts crawl example 50
-
-# 4. start the API
-node --experimental-strip-types services/api/src/server.ts
-#   → http://127.0.0.1:8080/healthz
-
-# 5. search
-curl "http://127.0.0.1:8080/v1/search?q=example&source=example&facets=true"
+# From the repository root
+npm run infra:up    # Meilisearch :7700, Redis :6379
+npm run api         # API only, :8080
+npm run dev         # API + web UI, with a health check
 ```
 
----
-
-## Configuration
-
-All config via `.env` (see `.env.example`):
-
-| Var | Default | Purpose |
-|---|---|---|
-| `MEILI_HOST` | `http://127.0.0.1:7700` | Meilisearch URL |
-| `MEILI_MASTER_KEY` | — | Master key (set in `.env`) |
-| `MEILI_INDEX` | `zwep_documents` | Index UID |
-| `REDIS_URL` | `redis://127.0.0.1:6379` | Queue (P2) |
-| `CRAWLER_CONCURRENCY` | `4` | Parallel fetches per source |
-| `CRAWLER_DELAY_MS` | `500` | Min politeness delay (ms) |
-| `CRAWLER_USER_AGENT` | `ZwepBot/0.1` | UA sent to sites |
-| `API_PORT` / `API_HOST` | `8080` / `0.0.0.0` | HTTP bind |
-| `API_CORS_ORIGINS` | `http://localhost:3000` | CORS allowlist (CSV) |
-
-Sources are declared in **`config/sources.yaml`** — `seeds`, `sitemap`,
-`allowedDomains`, `maxPages`, `maxDepth`, `respectRobots`.
-
----
-
-## API
-
-Base: `http://127.0.0.1:8080`
-
-| Method | Path | Params | Notes |
-|---|---|---|---|
-| GET | `/healthz` | — | liveness |
-| GET | `/v1/stats` | — | `{ ok, indexed }` |
-| GET | `/v1/search` | `q, limit, offset, source, type, tag, lang, from, to, sort, facets, highlight` | main search |
-| GET | `/v1/suggest` | `q, limit, source` | instant suggestions |
-| GET | `/v1/document/:id` | — | fetch one document |
-
-Full contract + examples: **`docs/api.md`**.
-
-### Example
+Crawl from the command line:
 
 ```bash
-curl "http://127.0.0.1:8080/v1/search?q=more&source=example&facets=true"
-# => { "query":"more", "total":1, "took_ms":6,
-#      "results":[{ "id":"example_7b6cd9a1d881", "title":"Example Domain", ... }],
-#      "facets":{ "source":{"example":1}, "type":{"page":1}, "lang":{"en":1} } }
+npx zwep crawl example            # one source, with live progress
+npx zwep crawl --all              # every enabled source
+npx zwep index https://example.com/page
 ```
 
----
+The lower-level worker CLI is still there if you want the pipeline without the
+HTTP API in between:
 
-## Notes / decisions
+```bash
+npm run crawl -- example 50
+```
 
-- **No build step.** Node ≥ 20 runs `.ts` directly via
-  `--experimental-strip-types`. Relative imports use the `.ts` extension.
-- **Engine-agnostic index.** Clients never touch Meilisearch. Swapping to
-  Elastic later means writing one new `IndexAdapter`.
-- **Polite by default.** `robots.txt`, `Crawl-delay`, and a per-host minimum
-  delay are always honoured. Curate `allowedDomains` strictly.
-- **Playwright is a fallback**, not the default path. Static HTML is fetched
-  first; only JS-heavy pages get rendered.
+## Two things worth knowing before you change anything
 
----
+**The document id must stay derived from the URL.** It is
+`{source}_{sha256(canonicalUrl)[0..15]}`. Deriving it from content mints a new
+document on every change and orphans the previous one — that was a real bug, and
+`tests/node/url.test.ts` now locks the invariant down.
 
-## Next (roadmap)
+**Optional providers must fail soft.** `getEmbedProvider()` and
+`getLlmProvider()` return `null` when unreachable and back off for 60 seconds.
+Nothing in the search path may throw because an optional feature is unavailable.
 
-See **`docs/roadmap.md`**: incremental crawl scheduling (BullMQ+Redis),
-quality scoring, the OpenAI-styled web UI, admin console, and deployment.
+## Testing
+
+```bash
+npx vitest run --project node
+```
+
+No test needs a network or a running Meilisearch. The API is exercised through
+`app.inject()` against a fake `IndexAdapter`; providers are stubbed. Keep it
+that way — the suite finishing in seconds is what makes it get run.

@@ -59,7 +59,7 @@ world" feature inside cust*m Tab.
 
 ---
 
-## 4. Scope boundaries (v1)
+## 4. Scope boundaries
 
 - **Whitelist only.** Crawl starts from an explicit `seeds` list + optional
   `sitemap.xml`. No open-ended discovery beyond `allowedDomains`.

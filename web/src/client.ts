@@ -1,15 +1,100 @@
-import type { SearchResponse, SearchResult, SearchParams, SourceConfig } from '@zwep/shared';
+import type {
+  SearchResponse,
+  SearchResult,
+  SearchParams,
+  SourceConfig,
+  CrawlTask,
+  Document,
+} from '@zwep/shared';
+
+/**
+ * Typed browser client for the Zwep API.
+ *
+ * In dev, Vite proxies `/v1/*` to the API on :8080; in production the API sits
+ * behind the same origin. Nothing here hard-codes a host, so the built bundle
+ * works unchanged behind any reverse proxy.
+ */
 
 const BASE = '/v1';
 
-async function getJson<T>(url: string): Promise<T> {
-  const res = await fetch(url);
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body?.error?.message || `Request failed: ${res.status}`);
+/** Requests are abandoned after this long so the UI never hangs forever. */
+const TIMEOUT_MS = 30_000;
+const LONG_TIMEOUT_MS = 120_000;
+
+export class ApiError extends Error {
+  readonly status: number;
+  readonly code: string;
+
+  constructor(message: string, status = 0, code = 'error') {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.code = code;
   }
-  return res.json() as Promise<T>;
+
+  /** True when the API could not be reached at all (as opposed to a 4xx/5xx). */
+  get isOffline(): boolean {
+    return this.status === 0;
+  }
 }
+
+interface RequestOptions {
+  method?: string;
+  body?: unknown;
+  adminKey?: string;
+  timeoutMs?: number;
+  signal?: AbortSignal;
+}
+
+async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
+  const headers: Record<string, string> = { accept: 'application/json' };
+  if (opts.body !== undefined) headers['content-type'] = 'application/json';
+  // The admin key travels in a header, never in the query string: query
+  // strings leak into browser history, referrers and proxy logs.
+  if (opts.adminKey) headers['x-admin-key'] = opts.adminKey;
+
+  const timeout = AbortSignal.timeout(opts.timeoutMs ?? TIMEOUT_MS);
+  const signal = opts.signal ? AbortSignal.any([opts.signal, timeout]) : timeout;
+
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${path}`, {
+      method: opts.method ?? 'GET',
+      headers,
+      body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+      signal,
+    });
+  } catch (e) {
+    if ((e as Error).name === 'AbortError' && opts.signal?.aborted) throw e;
+    throw new ApiError('Cannot reach the search service. Is the API running?', 0, 'offline');
+  }
+
+  if (res.status === 204) return undefined as T;
+
+  let payload: unknown = null;
+  const text = await res.text();
+  if (text) {
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      payload = null;
+    }
+  }
+
+  if (!res.ok) {
+    const err = (payload as { error?: { message?: string; code?: string } } | null)?.error;
+    throw new ApiError(
+      err?.message ?? `Request failed (${res.status})`,
+      res.status,
+      err?.code ?? String(res.status),
+    );
+  }
+  return payload as T;
+}
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
 
 export interface SuggestItem {
   text: string;
@@ -17,9 +102,11 @@ export interface SuggestItem {
   type: string;
 }
 
-export async function search(params: Partial<SearchParams> & { q: string }): Promise<SearchResponse> {
-  const sp = new URLSearchParams();
-  sp.set('q', params.q);
+export async function search(
+  params: Partial<SearchParams> & { q: string },
+  signal?: AbortSignal,
+): Promise<SearchResponse> {
+  const sp = new URLSearchParams({ q: params.q });
   if (params.limit) sp.set('limit', String(params.limit));
   if (params.offset) sp.set('offset', String(params.offset));
   if (params.source?.length) sp.set('source', params.source.join(','));
@@ -32,28 +119,30 @@ export async function search(params: Partial<SearchParams> & { q: string }): Pro
   if (params.facets) sp.set('facets', 'true');
   if (params.highlight === false) sp.set('highlight', 'false');
   if (params.semantic) sp.set('semantic', 'true');
-  if (params.fuzzy === false) sp.set('fuzzy', 'false');
-  return getJson<SearchResponse>(`${BASE}/search?${sp.toString()}`);
+  return request<SearchResponse>(`/search?${sp}`, { signal });
 }
 
-export async function suggest(q: string, source?: string, limit = 8): Promise<SuggestItem[]> {
-  const sp = new URLSearchParams({ q });
-  if (source) sp.set('source', source);
-  sp.set('limit', String(limit));
-  const r = await getJson<{ query: string; suggestions: SuggestItem[] }>(`${BASE}/suggest?${sp.toString()}`);
-  return r.suggestions;
+export async function suggest(q: string, limit = 8, signal?: AbortSignal): Promise<SuggestItem[]> {
+  const sp = new URLSearchParams({ q, limit: String(limit) });
+  const r = await request<{ suggestions: SuggestItem[] }>(`/suggest?${sp}`, { signal });
+  return r.suggestions ?? [];
 }
 
-export async function getDocument(id: string): Promise<SearchResult | null> {
-  try {
-    return await getJson<SearchResult>(`${BASE}/document/${encodeURIComponent(id)}`);
-  } catch {
-    return null;
-  }
+export function getDocument(id: string): Promise<Document> {
+  return request<Document>(`/document/${encodeURIComponent(id)}`);
 }
 
-export async function stats(): Promise<{ ok: boolean; indexed: number }> {
-  return getJson(`${BASE}/stats`);
+export interface StatsResponse {
+  ok: boolean;
+  indexed: number;
+  sources: number;
+  sourcesEnabled: number;
+  llm: string;
+  runningCrawls: number;
+}
+
+export function stats(): Promise<StatsResponse> {
+  return request<StatsResponse>('/stats');
 }
 
 export interface GraphNode {
@@ -62,12 +151,14 @@ export interface GraphNode {
   type: string;
   doc_count: number;
 }
+
 export interface GraphEdge {
   src: string;
   dst: string;
   weight: number;
   kind: string;
 }
+
 export interface GraphResponse {
   ok: boolean;
   query: string;
@@ -76,8 +167,8 @@ export interface GraphResponse {
   stats: { entities: number; edges: number };
 }
 
-export async function graph(q: string): Promise<GraphResponse> {
-  return getJson<GraphResponse>(`${BASE}/graph?q=${encodeURIComponent(q)}`);
+export function graph(q: string, signal?: AbortSignal): Promise<GraphResponse> {
+  return request<GraphResponse>(`/graph?q=${encodeURIComponent(q)}`, { signal });
 }
 
 export interface OverviewResponse {
@@ -88,8 +179,11 @@ export interface OverviewResponse {
   sources: { title: string; url: string; source: string }[];
 }
 
-export async function overview(q: string): Promise<OverviewResponse> {
-  return getJson<OverviewResponse>(`${BASE}/overview?q=${encodeURIComponent(q)}`);
+export function overview(q: string, signal?: AbortSignal): Promise<OverviewResponse> {
+  return request<OverviewResponse>(`/overview?q=${encodeURIComponent(q)}`, {
+    timeoutMs: LONG_TIMEOUT_MS,
+    signal,
+  });
 }
 
 export interface ModelInfo {
@@ -99,10 +193,10 @@ export interface ModelInfo {
   context_length?: number;
 }
 
+/** Model lists are optional niceties — an unreachable provider yields []. */
 export async function ollamaModels(): Promise<ModelInfo[]> {
   try {
-    const r = await getJson<{ ok: boolean; models: ModelInfo[] }>(`${BASE}/ollama-models`);
-    return r.models || [];
+    return (await request<{ models: ModelInfo[] }>('/ollama-models')).models ?? [];
   } catch {
     return [];
   }
@@ -110,112 +204,111 @@ export async function ollamaModels(): Promise<ModelInfo[]> {
 
 export async function openrouterModels(): Promise<ModelInfo[]> {
   try {
-    const r = await getJson<{ ok: boolean; models: ModelInfo[] }>(`${BASE}/openrouter-models`);
-    return r.models || [];
+    return (await request<{ models: ModelInfo[] }>('/openrouter-models')).models ?? [];
   } catch {
     return [];
   }
 }
 
-// ---------- Admin ----------
-export interface CrawlTask {
-  id: string;
-  source: string;
-  status: 'running' | 'done' | 'error';
-  startedAt: string;
-  finishedAt?: string;
-  summary?: { pages: number; skipped: number; failed: number; indexed: number; seconds: number };
-  error?: string;
+export function pushSettings(
+  adminKey: string,
+  settings: {
+    llmProvider: string;
+    ollamaLlmModel?: string;
+    openrouterLlmModel?: string;
+    openrouterLlmKey?: string;
+  },
+): Promise<{ ok: boolean; llmProvider: string }> {
+  return request('/settings', { method: 'POST', adminKey, body: settings });
 }
 
-export async function adminListSources(adminKey: string): Promise<SourceConfig[]> {
-  const r = await getJson<{ sources: SourceConfig[] }>(`${BASE}/admin/sources?admin_key=${encodeURIComponent(adminKey)}`);
-  return r.sources;
-}
+// ---------------------------------------------------------------------------
+// Admin
+// ---------------------------------------------------------------------------
 
-export async function adminUpsertSource(adminKey: string, src: SourceConfig): Promise<SourceConfig> {
-  const res = await fetch(`${BASE}/admin/sources?admin_key=${encodeURIComponent(adminKey)}`, {
-    method: 'PUT',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(src),
-  });
-  if (!res.ok) {
-    const b = await res.json().catch(() => ({}));
-    throw new Error(b?.error?.message || `Save failed: ${res.status}`);
-  }
-  return (await res.json()).source;
-}
-
-export async function adminDeleteSource(adminKey: string, name: string): Promise<void> {
-  const res = await fetch(`${BASE}/admin/sources/${encodeURIComponent(name)}?admin_key=${encodeURIComponent(adminKey)}`, {
-    method: 'DELETE',
-  });
-  if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
-}
-
-export async function adminCrawl(adminKey: string, source: string, maxPages?: number): Promise<string> {
-  const res = await fetch(`${BASE}/admin/crawl?admin_key=${encodeURIComponent(adminKey)}`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ source, maxPages }),
-  });
-  if (!res.ok) {
-    const b = await res.json().catch(() => ({}));
-    throw new Error(b?.error?.message || `Crawl failed: ${res.status}`);
-  }
-  return (await res.json()).taskId;
-}
-
-export async function adminCrawlStatus(adminKey: string, taskId: string): Promise<CrawlTask> {
-  const r = await getJson<{ task: CrawlTask }>(`${BASE}/admin/crawl/${encodeURIComponent(taskId)}?admin_key=${encodeURIComponent(adminKey)}`);
-  return r.task;
-}
-
-export async function adminCrawlAll(adminKey: string, maxPages?: number): Promise<{ ok: boolean; batchId: string; count: number }> {
-  const res = await fetch(`${BASE}/admin/crawl-all?admin_key=${encodeURIComponent(adminKey)}`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ maxPages }),
-  });
-  if (!res.ok) {
-    const b = await res.json().catch(() => ({}));
-    throw new Error(b?.error?.message || `Crawl-all failed: ${res.status}`);
-  }
-  return res.json();
-}
-
-export async function adminCrawlUrl(adminKey: string, url: string): Promise<{ ok: boolean; taskId: string; source: string }> {
-  const res = await fetch(`${BASE}/admin/crawl-url?admin_key=${encodeURIComponent(adminKey)}`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ url }),
-  });
-  if (!res.ok) {
-    const b = await res.json().catch(() => ({}));
-    throw new Error(b?.error?.message || `Crawl-URL failed: ${res.status}`);
-  }
-  return res.json();
-}
-
-export async function adminDeindexAll(adminKey: string): Promise<{ ok: boolean; message: string }> {
-  const res = await fetch(`${BASE}/admin/deindex-all?admin_key=${encodeURIComponent(adminKey)}`, {
-    method: 'POST',
-  });
-  if (!res.ok) {
-    const b = await res.json().catch(() => ({}));
-    throw new Error(b?.error?.message || `Deindex failed: ${res.status}`);
-  }
-  return res.json();
-}
-
-export async function adminCrawlAllStatus(adminKey: string, batchId: string): Promise<{ batch: CrawlTask[] }> {
-  return getJson<{ batch: CrawlTask[] }>(`${BASE}/admin/crawl-all/${encodeURIComponent(batchId)}?admin_key=${encodeURIComponent(adminKey)}`);
-}
+export type { CrawlTask };
 
 export interface AdminConfig {
   googleProxyEnabled: boolean;
+  llmProvider: string;
+  maxConcurrentCrawls: number;
 }
-export async function adminConfig(adminKey: string): Promise<AdminConfig> {
-  const r = await getJson<AdminConfig>(`${BASE}/admin/config?admin_key=${encodeURIComponent(adminKey)}`);
-  return r;
+
+export function adminConfig(adminKey: string): Promise<AdminConfig> {
+  return request<AdminConfig>('/admin/config', { adminKey });
 }
+
+export async function adminListSources(adminKey: string): Promise<SourceConfig[]> {
+  return (await request<{ sources: SourceConfig[] }>('/admin/sources', { adminKey })).sources;
+}
+
+export async function adminUpsertSource(
+  adminKey: string,
+  src: SourceConfig,
+): Promise<SourceConfig> {
+  const r = await request<{ source: SourceConfig }>('/admin/sources', {
+    method: 'PUT',
+    adminKey,
+    body: src,
+  });
+  return r.source;
+}
+
+export function adminDeleteSource(
+  adminKey: string,
+  name: string,
+  purge = false,
+): Promise<{ ok: boolean; purged: boolean }> {
+  const suffix = purge ? '?purge=true' : '';
+  return request(`/admin/sources/${encodeURIComponent(name)}${suffix}`, {
+    method: 'DELETE',
+    adminKey,
+  });
+}
+
+export async function adminCrawl(
+  adminKey: string,
+  source: string,
+  maxPages?: number,
+): Promise<string> {
+  const r = await request<{ taskId: string }>('/admin/crawl', {
+    method: 'POST',
+    adminKey,
+    body: { source, maxPages },
+  });
+  return r.taskId;
+}
+
+export async function adminCrawlStatus(adminKey: string, taskId: string): Promise<CrawlTask> {
+  const r = await request<{ task: CrawlTask }>(`/admin/crawl/${encodeURIComponent(taskId)}`, {
+    adminKey,
+  });
+  return r.task;
+}
+
+export function adminCrawlAll(
+  adminKey: string,
+  maxPages?: number,
+): Promise<{ ok: boolean; batchId: string; count: number }> {
+  return request('/admin/crawl-all', { method: 'POST', adminKey, body: { maxPages } });
+}
+
+export function adminCrawlAllStatus(
+  adminKey: string,
+  batchId: string,
+): Promise<{ batch: CrawlTask[]; done: number; total: number }> {
+  return request(`/admin/crawl-all/${encodeURIComponent(batchId)}`, { adminKey });
+}
+
+export function adminCrawlUrl(
+  adminKey: string,
+  url: string,
+): Promise<{ ok: boolean; taskId: string; source: string }> {
+  return request('/admin/crawl-url', { method: 'POST', adminKey, body: { url } });
+}
+
+export function adminDeindexAll(adminKey: string): Promise<{ ok: boolean; message: string }> {
+  return request('/admin/deindex-all', { method: 'POST', adminKey });
+}
+
+export type { SearchResult };

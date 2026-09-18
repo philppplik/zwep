@@ -1,4 +1,4 @@
-import { loadEnv } from '@zwep/config';
+import { loadEnv, oneLine } from '@zwep/config';
 
 /**
  * Embedding provider abstraction for semantic search (Phase B).
@@ -11,6 +11,9 @@ import { loadEnv } from '@zwep/config';
  * All methods degrade gracefully: if the provider is unreachable we throw a
  * typed error the caller can catch and fall back to lexical search.
  */
+
+/** Embedding requests are abandoned after this long. */
+const EMBED_TIMEOUT_MS = 60_000;
 
 export class EmbedError extends Error {
   constructor(message: string) {
@@ -52,9 +55,12 @@ class OllamaEmbed implements EmbedProvider {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model: this.model, prompt: t.slice(0, 8000) }),
+        signal: AbortSignal.timeout(EMBED_TIMEOUT_MS),
       });
       if (!res.ok) {
-        throw new EmbedError(`Ollama embed failed: ${res.status} ${await res.text().catch(() => '')}`);
+        throw new EmbedError(
+          `Ollama embed failed: ${res.status} ${await res.text().catch(() => '')}`,
+        );
       }
       const data = (await res.json()) as { embedding: number[] };
       out.push(data.embedding);
@@ -91,9 +97,12 @@ class OpenRouterEmbed implements EmbedProvider {
         Authorization: `Bearer ${this.key}`,
       },
       body: JSON.stringify({ model: this.model, input: texts.map((t) => t.slice(0, 8000)) }),
+      signal: AbortSignal.timeout(EMBED_TIMEOUT_MS),
     });
     if (!res.ok) {
-      throw new EmbedError(`OpenRouter embed failed: ${res.status} ${await res.text().catch(() => '')}`);
+      throw new EmbedError(
+        `OpenRouter embed failed: ${res.status} ${await res.text().catch(() => '')}`,
+      );
     }
     const data = (await res.json()) as { data: { embedding: number[] }[] };
     return data.data.map((d) => d.embedding);
@@ -101,12 +110,21 @@ class OpenRouterEmbed implements EmbedProvider {
 }
 
 let provider: EmbedProvider | null = null;
-let disabled = false;
+let disabledUntil = 0;
 
-/** Returns the active embedding provider, or null if semantic search is off/unavailable. */
+/** After a failed probe, wait this long before trying the provider again. */
+const RETRY_AFTER_MS = 60_000;
+
+/**
+ * Returns the active embedding provider, or null if semantic search is off or
+ * the provider is unreachable.
+ *
+ * An unreachable provider is disabled for `RETRY_AFTER_MS`, not forever: a
+ * transient blip during boot used to kill semantic search until restart.
+ */
 export async function getEmbedProvider(): Promise<EmbedProvider | null> {
-  if (disabled) return null;
   if (provider) return provider;
+  if (Date.now() < disabledUntil) return null;
   const env = loadEnv();
   if (env.EMBED_PROVIDER === 'none' || !env.EMBED_PROVIDER) return null;
   try {
@@ -116,13 +134,16 @@ export async function getEmbedProvider(): Promise<EmbedProvider | null> {
     provider = p;
     return provider;
   } catch (e) {
-    disabled = true;
-    console.warn(`[embed] provider '${env.EMBED_PROVIDER}' unavailable: ${(e as Error).message}. Semantic search disabled.`);
+    disabledUntil = Date.now() + RETRY_AFTER_MS;
+    console.warn(
+      `[embed] provider '${env.EMBED_PROVIDER}' unavailable: ${oneLine((e as Error).message)}. ` +
+        `Semantic search paused for ${RETRY_AFTER_MS / 1000}s.`,
+    );
     return null;
   }
 }
 
 export function resetEmbedProvider() {
   provider = null;
-  disabled = false;
+  disabledUntil = 0;
 }

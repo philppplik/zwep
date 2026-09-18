@@ -24,7 +24,11 @@ async function main() {
     });
     process.exit(0);
   } else if (cmd === 'list') {
-    console.log(loadSources().map((s) => `- ${s.name} (${s.allowedDomains.join(', ')})`).join('\n'));
+    console.log(
+      loadSources()
+        .map((s) => `- ${s.name} (${s.allowedDomains.join(', ')})`)
+        .join('\n'),
+    );
     process.exit(0);
   } else {
     console.log('Usage:');

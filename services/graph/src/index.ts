@@ -1,7 +1,7 @@
-import { loadEnv } from '@zwep/config';
+import { loadEnv, dataDir } from '@zwep/config';
 import Database from 'better-sqlite3';
 import { resolve, dirname } from 'node:path';
-import { mkdirSync, existsSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 
 /**
  * Lightweight knowledge graph over indexed documents (Phase B).
@@ -15,6 +15,13 @@ import { mkdirSync, existsSync } from 'node:fs';
  * This gives a real, queryable graph without Neo4j. A future LLM-based
  * extractor can replace `extractEntities` transparently.
  */
+
+/**
+ * Upper bound on entities harvested from one document. Without it, a glossary
+ * page produced thousands of entities and O(n^2) co-mention edges, which is
+ * how a single crawl could balloon the graph database.
+ */
+export const MAX_ENTITIES_PER_DOC = 60;
 
 export interface Entity {
   label: string;
@@ -38,7 +45,10 @@ export interface GraphEdge {
 function dbPath(): string {
   const env = loadEnv();
   if (env.GRAPH_DB) return env.GRAPH_DB;
-  return resolve(process.cwd(), 'data/graph.db');
+  // Anchored to the repo's data directory rather than `process.cwd()`, so the
+  // API, the CLI and the worker all open the same database no matter where
+  // they were started from.
+  return resolve(dataDir(), 'graph.db');
 }
 
 /** Canonical alias map — merges spelling/name variants into one entity. */
@@ -46,15 +56,14 @@ const ALIASES: Record<string, string> = {
   'angela merkel': 'merkel',
   'mutti merkel': 'merkel',
   'olaf scholz': 'scholz',
-  'olaf scholz': 'scholz',
-  'robert habek': 'habek',
-  'robert haben': 'habek',
+  'robert habeck': 'habeck',
   'christian lindner': 'lindner',
   'friedrich merz': 'merz',
   'donald trump': 'trump',
   'joe biden': 'biden',
   'wladimir putin': 'putin',
-  'berlin': 'berlin',
+  'vladimir putin': 'putin',
+  'ursula von der leyen': 'von_der_leyen',
 };
 
 /** Levenshtein distance (for fuzzy entity merging). */
@@ -75,15 +84,30 @@ function levenshtein(a: string, b: string): number {
 }
 
 /**
+ * Cap on how many known entities a fuzzy lookup may compare against.
+ *
+ * The fuzzy merge is O(entities) per candidate, so on a graph with 100k
+ * entities a single document triggered millions of Levenshtein runs and the
+ * crawl stalled. Comparing against a bounded, length-bucketed slice keeps the
+ * useful typo merges ("Märkel" → "merkel") at a fixed cost.
+ */
+const FUZZY_SCAN_LIMIT = 2000;
+
+/**
  * Normalize a raw entity label to its canonical form.
- * Applies: lowercase trim, alias merge, then fuzzy match against existing
- * entities (Levenshtein <= 1) to merge typos like "Märkel" → "Merkel".
+ * Applies: lowercase trim, alias merge, then a bounded fuzzy match against
+ * known entities (Levenshtein <= 1) to merge typos like "Märkel" → "merkel".
  */
 function normalizeEntity(label: string, existing: Set<string>): string {
   const low = label.toLowerCase().trim();
   if (ALIASES[low]) return ALIASES[low];
-  // direct fuzzy match vs known entities
+  if (existing.has(low)) return low;
+  // Exact hits are handled above; only short labels benefit from fuzzy merging
+  // and only a bounded slice of the entity set is scanned.
+  if (low.length < 4 || low.length > 40) return low;
+  let scanned = 0;
   for (const e of existing) {
+    if (scanned++ > FUZZY_SCAN_LIMIT) break;
     if (Math.abs(e.length - low.length) > 1) continue;
     if (levenshtein(e, low) <= 1) return e;
   }
@@ -126,12 +150,22 @@ export class KnowledgeGraph {
     `);
   }
 
-  /** Extract candidate entities from a document's text. Heuristic, fast, no deps. */
+  /**
+   * Extract candidate entities from a document's text. Heuristic, fast, no deps.
+   *
+   * Matches runs of capitalised words, optionally followed by a legal-form
+   * suffix. The suffix clause matters: `GmbH`, `AG` and `LLC` are not
+   * `[A-Z][a-z]+`, so without it "Acme GmbH" was only ever captured as "Acme"
+   * and `guessType`'s organisation branch could never fire on real text.
+   */
   static extractEntities(text: string, title = ''): Entity[] {
     const blob = `${title}. ${text}`;
     const found = new Map<string, string>();
-    // proper nouns: sequences of Capitalized words (2-4 tokens), len >= 3
-    const re = /\b([A-Z][a-zäöüß]{2,}(?:\s+[A-Z][a-zäöüß]{2,}){0,3})\b/g;
+    const word = '[A-Z][a-zäöüßéèêáàâ]{2,}';
+    const re = new RegExp(
+      `\\b(${word}(?:\\s+${word}){0,3}(?:\\s+(?:${LEGAL_FORMS.join('|')}))?)\\b`,
+      'g',
+    );
     let m: RegExpExecArray | null;
     while ((m = re.exec(blob)) !== null) {
       const label = m[1].trim();
@@ -139,35 +173,48 @@ export class KnowledgeGraph {
       const id = slug(label);
       if (!found.has(id)) found.set(id, label);
     }
-    return [...found].map(([id, label]) => ({ label, type: guessType(label) }));
+    return [...found]
+      .slice(0, MAX_ENTITIES_PER_DOC)
+      .map(([, label]) => ({ label, type: guessType(label) }));
   }
 
-  /** Upsert entities + co-mention edges for one document. */
-  indexDoc(docId: string, entities: Entity[]) {
+  /**
+   * Upsert entities and co-mention edges for one document.
+   *
+   * Each distinct entity counts once per document (the label may appear many
+   * times in the text), and edges are stored with `src < dst` so that a pair
+   * co-mentioned in two documents strengthens one edge instead of creating two
+   * mirrored ones.
+   */
+  indexDoc(_docId: string, entities: Entity[]) {
     if (!entities.length) return;
     this.loadEntityCache();
+
+    const insertEntity = this.db.prepare(
+      'INSERT INTO entities (id, label, type, doc_count) VALUES (?,?,?,1) ' +
+        'ON CONFLICT(id) DO UPDATE SET doc_count = doc_count + 1',
+    );
+    const insertEdge = this.db.prepare(
+      "INSERT INTO edges (src, dst, weight, kind) VALUES (?,?,1,'co-mention') " +
+        'ON CONFLICT(src,dst,kind) DO UPDATE SET weight = weight + 1',
+    );
+
     const tx = this.db.transaction((ents: Entity[]) => {
+      const ids = new Map<string, { label: string; type: string }>();
       for (const e of ents) {
         const canon = normalizeEntity(e.label, this.entityCache!);
         const id = slug(canon);
-        if (!this.entityCache!.has(id)) {
-          this.entityCache!.add(id);
-          this.db
-            .prepare('INSERT INTO entities (id, label, type, doc_count) VALUES (?,?,?,1) ON CONFLICT(id) DO UPDATE SET doc_count = doc_count + 1')
-            .run(id, canon, e.type);
-        } else {
-          this.db.prepare('UPDATE entities SET doc_count = doc_count + 1 WHERE id = ?').run(id);
-        }
+        if (id && !ids.has(id)) ids.set(id, { label: canon, type: e.type });
       }
-      // co-mention edges between all pairs in this doc
-      const ids = [...new Set(ents.map((e) => slug(normalizeEntity(e.label, this.entityCache!))))];
-      for (let i = 0; i < ids.length; i++) {
-        for (let j = i + 1; j < ids.length; j++) {
-          const a = ids[i];
-          const b = ids[j];
-          this.db
-            .prepare("INSERT INTO edges (src, dst, weight, kind) VALUES (?,?,1,'co-mention') ON CONFLICT(src,dst,kind) DO UPDATE SET weight = weight + 1")
-            .run(a, b);
+      for (const [id, { label, type }] of ids) {
+        insertEntity.run(id, label, type);
+        this.entityCache!.add(id);
+      }
+      const list = [...ids.keys()];
+      for (let i = 0; i < list.length; i++) {
+        for (let j = i + 1; j < list.length; j++) {
+          const [a, b] = list[i] < list[j] ? [list[i], list[j]] : [list[j], list[i]];
+          insertEdge.run(a, b);
         }
       }
     });
@@ -187,7 +234,9 @@ export class KnowledgeGraph {
     // expand one hop
     const seenEdge = new Set<string>();
     for (const s of seeds) {
-      const out = this.db.prepare('SELECT * FROM edges WHERE src = ? OR dst = ? ORDER BY weight DESC LIMIT ?').all(s.id, s.id, depth * 10) as GraphEdge[];
+      const out = this.db
+        .prepare('SELECT * FROM edges WHERE src = ? OR dst = ? ORDER BY weight DESC LIMIT ?')
+        .all(s.id, s.id, depth * 10) as GraphEdge[];
       for (const e of out) {
         const key = `${e.src}|${e.dst}|${e.kind}`;
         if (seenEdge.has(key)) continue;
@@ -211,7 +260,9 @@ export class KnowledgeGraph {
 
   /** Export the full graph (all entities + edges) as a shareable object. */
   all(): { nodes: GraphNode[]; edges: GraphEdge[]; stats: { entities: number; edges: number } } {
-    const nodes = this.db.prepare('SELECT * FROM entities ORDER BY doc_count DESC').all() as GraphNode[];
+    const nodes = this.db
+      .prepare('SELECT * FROM entities ORDER BY doc_count DESC')
+      .all() as GraphNode[];
     const edges = this.db.prepare('SELECT * FROM edges ORDER BY weight DESC').all() as GraphEdge[];
     return { nodes, edges, stats: this.stats() };
   }
@@ -221,23 +272,135 @@ export class KnowledgeGraph {
   }
 }
 
+/**
+ * Turn an entity label into a stable id.
+ *
+ * The input is crawled page text, so it is attacker-influenced. `/^_+|_+$/`
+ * over a long run of separators backtracks polynomially, which makes a page of
+ * punctuation a cheap way to stall a crawl. Trimming the separator with
+ * explicit index arithmetic is linear and does the same job.
+ */
 function slug(s: string): string {
-  return s.toLowerCase().replace(/[^a-z0-9äöüß]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 64);
+  const collapsed = s.toLowerCase().replace(/[^a-z0-9äöüß]+/g, '_');
+  let start = 0;
+  let end = collapsed.length;
+  while (start < end && collapsed[start] === '_') start++;
+  while (end > start && collapsed[end - 1] === '_') end--;
+  return collapsed.slice(start, end).slice(0, 64);
 }
+
+/**
+ * Legal-form suffixes that mark an entity as an organisation.
+ *
+ * Also spliced into the entity regex above, so "Acme GmbH" is captured as one
+ * entity instead of the bare "Acme" — which is why this branch used to be
+ * unreachable on real text.
+ */
+const LEGAL_FORMS = [
+  'GmbH',
+  'mbH',
+  'AG',
+  'SE',
+  'KG',
+  'Inc',
+  'LLC',
+  'Ltd',
+  'Corp',
+  'PLC',
+  'BV',
+  'NV',
+  'SA',
+  'SAS',
+  'SRL',
+  'Oy',
+  'AB',
+];
+
+const ORG_RE = new RegExp(`\\b(?:${LEGAL_FORMS.join('|')})\\b`, 'i');
+const INSTITUTION_RE =
+  /\b(University|Universit[äa]t|Hochschule|Institute?|Institut|Foundation|Stiftung|Laboratory|Lab)\b/i;
 
 function guessType(label: string): string {
   if (/^[A-Z]\w+\s+\d{4}$/.test(label)) return 'event';
-  if (/\b(GmbH|Inc|LLC|AG|Corp|Ltd)\b/i.test(label)) return 'org';
-  if (/\b(University|Institute|Lab)\b/i.test(label)) return 'org';
+  if (ORG_RE.test(label)) return 'org';
+  if (INSTITUTION_RE.test(label)) return 'org';
   return 'concept';
 }
 
 const STOPWORDS = new Set([
-  'the', 'and', 'for', 'with', 'this', 'that', 'from', 'your', 'are', 'was', 'were',
-  'have', 'has', 'will', 'can', 'not', 'but', 'they', 'their', 'our', 'all', 'more',
-  'what', 'when', 'where', 'which', 'who', 'how', 'why', 'der', 'die', 'das', 'und',
-  'für', 'mit', 'nicht', 'ein', 'eine', 'ist', 'sind', 'werden', 'wird', 'auf', 'von',
-  'im', 'am', 'an', 'als', 'wie', 'nach', 'über', 'zum', 'zur', 'des', 'dem', 'den',
-  'about', 'into', 'than', 'then', 'them', 'there', 'here', 'also', 'been', 'being',
-  'search', 'results', 'result', 'page', 'website', 'home', 'menu', 'privacy', 'imprint',
+  'the',
+  'and',
+  'for',
+  'with',
+  'this',
+  'that',
+  'from',
+  'your',
+  'are',
+  'was',
+  'were',
+  'have',
+  'has',
+  'will',
+  'can',
+  'not',
+  'but',
+  'they',
+  'their',
+  'our',
+  'all',
+  'more',
+  'what',
+  'when',
+  'where',
+  'which',
+  'who',
+  'how',
+  'why',
+  'der',
+  'die',
+  'das',
+  'und',
+  'für',
+  'mit',
+  'nicht',
+  'ein',
+  'eine',
+  'ist',
+  'sind',
+  'werden',
+  'wird',
+  'auf',
+  'von',
+  'im',
+  'am',
+  'an',
+  'als',
+  'wie',
+  'nach',
+  'über',
+  'zum',
+  'zur',
+  'des',
+  'dem',
+  'den',
+  'about',
+  'into',
+  'than',
+  'then',
+  'them',
+  'there',
+  'here',
+  'also',
+  'been',
+  'being',
+  'search',
+  'results',
+  'result',
+  'page',
+  'website',
+  'home',
+  'menu',
+  'privacy',
+  'imprint',
 ]);

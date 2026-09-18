@@ -1,480 +1,385 @@
 import './styles/tokens.css';
 import './styles/app.css';
-import { SearchBar, ResultList, renderGraph, renderOverview } from './components.ts';
-import { search, suggest, graph, overview, ollamaModels, openrouterModels, type ModelInfo } from './client.ts';
-import { AdminView } from './admin.ts';
-import { stats } from './client.ts';
 
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
+import type { FacetCounts } from '@zwep/shared';
+import { SearchBar, ResultList, renderGraph, renderOverview } from './components.ts';
+import { search, stats, ApiError } from './client.ts';
+import { LibraryView } from './admin.ts';
+import { renderSettings } from './views/settings.ts';
+import { Disposables, escapeHtml } from './dom.ts';
+import { applyTheme, loadSettings, saveSettings, type Theme } from './settings.ts';
+
+/**
+ * Application shell and router.
+ *
+ * Routing is history-based with a single `popstate` listener, so the browser's
+ * back and forward buttons work everywhere. Each view returns its teardown
+ * through `viewDisposables`, which is flushed before the next view mounts.
+ */
 
 const root = document.getElementById('app')!;
 
-// ---------- Theme ----------
-const THEME_KEY = 'zwep-theme';
-function applyTheme(theme: 'light' | 'dark') {
-  document.documentElement.setAttribute('data-theme', theme);
-  localStorage.setItem(THEME_KEY, theme);
-}
-const saved = (localStorage.getItem(THEME_KEY) as 'light' | 'dark' | null) ?? 'light';
-applyTheme(saved);
+// ---------------------------------------------------------------------------
+// Shell
+// ---------------------------------------------------------------------------
 
-function paintIcon(btn: HTMLButtonElement) {
-  const dark = document.documentElement.getAttribute('data-theme') === 'dark';
-  btn.textContent = dark ? '☀' : '☾';
-}
+applyTheme(loadSettings().theme);
 
-// ---------- Top bar (shared across views) ----------
-function renderTopBar(opts: { back?: boolean; title?: string } = {}) {
-  const bar = document.createElement('div');
-  bar.className = 'z-topbar';
-  bar.innerHTML = `
-    <a class="z-topbar__brand" href="/" data-back>
-      <img class="z-topbar__logo" src="/zwep-logo.png" alt="Zwep" />
-      <span>Zwep</span>
-    </a>
-    ${opts.back ? '<button class="z-topbar__back" data-back>← Search</button>' : ''}
-    ${opts.title ? `<span class="z-topbar__title">${escapeHtml(opts.title)}</span>` : ''}
-  `;
-  bar.querySelector('[data-back]')!.addEventListener('click', (e) => {
-    e.preventDefault();
-    history.pushState({}, '', '/');
-    route();
-  });
-  return bar;
-}
+// Follow the OS when the user chose "system".
+window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change', () => {
+  if (loadSettings().theme === 'system') applyTheme('system');
+});
+
+const topbar = document.createElement('header');
+topbar.className = 'z-topbar';
+topbar.innerHTML = `
+  <a class="z-topbar__brand" href="/" data-route="/">
+    <img class="z-topbar__logo" src="/zwep-logo.png" alt="" width="28" height="28" />
+    <span>Zwep</span>
+  </a>
+  <span class="z-topbar__title" id="z-view-title"></span>
+  <nav class="z-topbar__nav" aria-label="Main">
+    <a class="z-topbar__link" href="/library" data-route="/library">Library</a>
+    <a class="z-topbar__link" href="/settings" data-route="/settings">Settings</a>
+    <button class="z-topbar__theme" id="z-theme" type="button" aria-label="Switch colour theme"></button>
+  </nav>
+`;
+root.appendChild(topbar);
+
 const main = document.createElement('main');
 main.className = 'z-main';
+main.id = 'z-main';
 root.appendChild(main);
 
-// ---------- Footer ----------
 const footer = document.createElement('footer');
 footer.className = 'z-footer';
 footer.innerHTML = `
-  <span class="z-footer__tag">A small, self-hosted search engine. Search what you curate.</span>
-  <nav class="z-footer__nav">
-    <a class="z-footer__link" id="nav-admin" href="/admin">Library</a>
-    <a class="z-footer__link" id="nav-settings" href="/settings">Settings</a>
+  <span class="z-footer__tag" id="z-footer-tag">A small, self-hosted search engine. Search what you curate.</span>
+  <nav class="z-footer__nav" aria-label="Footer">
+    <a class="z-footer__link" href="https://github.com/philppplik/zwep" target="_blank" rel="noopener noreferrer">GitHub</a>
+    <a class="z-footer__link" href="/library" data-route="/library">Library</a>
+    <a class="z-footer__link" href="/settings" data-route="/settings">Settings</a>
   </nav>
 `;
 root.appendChild(footer);
 
-// ---------- Result list (always present, below) ----------
-const results = new ResultList();
-root.appendChild(results.el);
-
-// ---------- Search state ----------
-const state = { q: '', offset: 0, loading: false, type: '' as string, semantic: false, fuzzy: true };
-
-function renderHome() {
-  main.className = 'z-main z-main--center';
-  main.innerHTML = `
-    <div class="z-hero">
-      <img class="z-hero__logo" src="/zwep-logo.png" alt="Zwep" />
-      <h1 class="z-hero__title">Zwep</h1>
-    </div>
-  `;
-  main.appendChild(searchBar.el);
-  results.el.style.display = 'none';
-  searchBar.focus();
+function paintThemeButton(): void {
+  const btn = topbar.querySelector<HTMLButtonElement>('#z-theme')!;
+  const t = loadSettings().theme;
+  btn.textContent = t === 'dark' ? '☀' : t === 'light' ? '☾' : '◐';
+  btn.title = `Theme: ${t} (click to cycle)`;
 }
+paintThemeButton();
+
+topbar.querySelector('#z-theme')!.addEventListener('click', () => {
+  const order: Theme[] = ['system', 'light', 'dark'];
+  const next = order[(order.indexOf(loadSettings().theme) + 1) % order.length];
+  saveSettings({ theme: next });
+  applyTheme(next);
+  paintThemeButton();
+});
+
+// One delegated handler for every in-app link, anywhere in the document.
+document.addEventListener('click', (e) => {
+  const link = (e.target as HTMLElement).closest<HTMLElement>('[data-route]');
+  if (!link) return;
+  // Let the browser handle modified clicks (new tab, download, …).
+  const me = e as MouseEvent;
+  if (me.metaKey || me.ctrlKey || me.shiftKey || me.altKey || me.button !== 0) return;
+  e.preventDefault();
+  navigate(link.dataset.route!);
+});
+
+// ---------------------------------------------------------------------------
+// Search state
+// ---------------------------------------------------------------------------
+
+interface SearchState {
+  q: string;
+  offset: number;
+  type: string;
+  facets: Map<string, string>;
+  view: 'results' | 'graph';
+}
+
+const state: SearchState = { q: '', offset: 0, type: '', facets: new Map(), view: 'results' };
+
+let searchAbort: AbortController | undefined;
+const viewDisposables = new Disposables();
+
+const searchBar = new SearchBar((q) => {
+  state.q = q;
+  state.offset = 0;
+  state.facets.clear();
+  navigate(searchUrl());
+});
+
+const results = new ResultList({
+  onRetry: () => void runSearch(),
+  onPage: (offset) => {
+    if (offset < 0) return;
+    state.offset = offset;
+    navigate(searchUrl());
+    main.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  },
+  onFacet: (kind, value) => {
+    if (!value) state.facets.clear();
+    else if (state.facets.get(kind) === value) state.facets.delete(kind);
+    else state.facets.set(kind, value);
+    state.offset = 0;
+    navigate(searchUrl());
+  },
+});
+
+function searchUrl(): string {
+  const sp = new URLSearchParams({ q: state.q });
+  if (state.type) sp.set('type', state.type);
+  if (state.offset) sp.set('offset', String(state.offset));
+  for (const [k, v] of state.facets) sp.set(`f_${k}`, v);
+  if (state.view === 'graph') sp.set('view', 'graph');
+  return `/?${sp}`;
+}
+
 const TABS = [
   { id: '', label: 'All' },
   { id: 'article', label: 'Articles' },
-  { id: 'image', label: 'Images' },
-  { id: 'video', label: 'Videos' },
+  { id: 'page', label: 'Pages' },
   { id: 'product', label: 'Products' },
+  { id: 'video', label: 'Videos' },
   { id: 'graph', label: 'Graph' },
 ];
 
-function renderResultsView() {
+function renderHome(): void {
+  main.className = 'z-main z-main--center';
+  main.innerHTML = `
+    <div class="z-hero">
+      <img class="z-hero__logo" src="/zwep-logo.png" alt="" width="72" height="72" />
+      <h1 class="z-hero__title">Zwep</h1>
+      <p class="z-hero__sub">Search only what you curated.</p>
+    </div>`;
+  main.appendChild(searchBar.el);
+  const tips = document.createElement('p');
+  tips.className = 'z-hero__tips';
+  tips.innerHTML = `Press <kbd>/</kbd> to focus · <a href="/library" data-route="/library">manage sources</a>`;
+  main.appendChild(tips);
+  results.clear();
+  searchBar.focus();
+}
+
+function renderSearchShell(): void {
   main.className = 'z-main';
   main.innerHTML = '';
-  // logo above the search input bar (Google-style: brand sits on top)
+
   const brand = document.createElement('div');
   brand.className = 'z-results__brand';
-  brand.innerHTML = `
-    <img class="z-results__logo" src="/zwep-logo.png" alt="Zwep" />
-    <span>Zwep</span>
-  `;
   main.appendChild(brand);
   main.appendChild(searchBar.el);
-  // tabs (All / Articles / Images / Videos / Products)
+
   const tabs = document.createElement('div');
   tabs.className = 'z-tabs';
-  tabs.innerHTML = TABS.map(
-    (t) => `<button class="z-tab${state.type === t.id ? ' is-active' : ''}" type="button" data-type="${t.id}">${t.label}</button>`
-  ).join('');
-  tabs.querySelectorAll<HTMLButtonElement>('.z-tab').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      state.type = btn.dataset.type || '';
-      if (state.type === 'graph') {
-        history.replaceState(null, '', `?q=${encodeURIComponent(state.q)}&view=graph`);
-        showGraph();
-        return;
-      }
-      history.replaceState(null, '', `?q=${encodeURIComponent(state.q)}${state.type ? `&type=${state.type}` : ''}`);
-      doSearch();
-    });
+  tabs.setAttribute('role', 'tablist');
+  tabs.innerHTML = TABS.map((t) => {
+    const active =
+      t.id === 'graph' ? state.view === 'graph' : state.view === 'results' && state.type === t.id;
+    return `<button class="z-tab${active ? ' is-active' : ''}" type="button" role="tab"
+              aria-selected="${active}" data-type="${t.id}">${t.label}</button>`;
+  }).join('');
+  tabs.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.z-tab');
+    if (!btn) return;
+    const id = btn.dataset.type ?? '';
+    if (id === 'graph') {
+      state.view = 'graph';
+    } else {
+      state.view = 'results';
+      state.type = id;
+    }
+    state.offset = 0;
+    navigate(searchUrl());
   });
   main.appendChild(tabs);
 
-  // AI Overview container (filled by renderOverview if enabled)
   const overviewBox = document.createElement('div');
   overviewBox.id = 'z-overview';
   overviewBox.className = 'z-overview-wrap';
   main.appendChild(overviewBox);
 
-  results.el.style.display = '';
+  main.appendChild(results.el);
 }
 
-async function showGraph() {
-  renderResultsView();
-  results.el.style.display = 'none';
-  const graphEl = document.createElement('div');
-  graphEl.className = 'z-graph-view';
-  main.appendChild(graphEl);
-  // export button
+async function runSearch(): Promise<void> {
+  if (!state.q.trim()) return renderHome();
+
+  renderSearchShell();
+  searchBar.setValue(state.q);
+  results.setActiveFacets(state.facets);
+  results.showSkeleton();
+
+  searchAbort?.abort();
+  searchAbort = new AbortController();
+  const { signal } = searchAbort;
+
+  const settings = loadSettings();
+  const overviewEl = document.getElementById('z-overview');
+  if (settings.overview && overviewEl) void renderOverview(overviewEl, state.q, signal);
+
+  try {
+    const resp = await search(
+      {
+        q: state.q,
+        facets: true,
+        limit: settings.resultsPerPage,
+        offset: state.offset,
+        type: state.type ? [state.type] : facetList('type'),
+        source: facetList('source'),
+        tag: facetList('tag'),
+        lang: state.facets.get('lang'),
+        semantic: settings.semantic || undefined,
+      },
+      signal,
+    );
+    if (signal.aborted) return;
+    results.render(resp, state.q);
+  } catch (e) {
+    if (signal.aborted || (e as Error).name === 'AbortError') return;
+    results.setError(e instanceof ApiError ? e : new Error(String(e)));
+  }
+}
+
+function facetList(kind: keyof FacetCounts): string[] | undefined {
+  const v = state.facets.get(kind);
+  return v ? [v] : undefined;
+}
+
+async function showGraph(): Promise<void> {
+  renderSearchShell();
+  searchBar.setValue(state.q);
+  results.clear();
+
+  const wrap = document.createElement('div');
+  wrap.className = 'z-graph-view';
+  main.appendChild(wrap);
+
   const exportBtn = document.createElement('button');
-  exportBtn.className = 'z-graph-export';
+  exportBtn.className = 'z-btn z-graph-export';
   exportBtn.type = 'button';
-  exportBtn.textContent = '⬇ Export JSON';
+  exportBtn.textContent = '⬇ Export graph as JSON';
   exportBtn.addEventListener('click', () => {
-    window.open(`/v1/graph?q=${encodeURIComponent(state.q)}&export=json`, '_blank');
+    window.open(`/v1/graph?q=${encodeURIComponent(state.q)}&export=json`, '_blank', 'noopener');
   });
   main.appendChild(exportBtn);
-  await renderGraph(graphEl, state.q);
+
+  searchAbort?.abort();
+  searchAbort = new AbortController();
+  const teardown = await renderGraph(wrap, state.q, searchAbort.signal);
+  viewDisposables.add(teardown);
 }
 
-const searchBar = new SearchBar(async (q) => {
-  state.q = q;
-  state.offset = 0;
-  history.replaceState(null, '', `?q=${encodeURIComponent(q)}`);
-  await doSearch();
-});
+// ---------------------------------------------------------------------------
+// Router
+// ---------------------------------------------------------------------------
 
-async function doSearch() {
-  if (!state.q.trim()) return;
-  renderResultsView();
-  results.showSkeleton();
-  state.loading = true;
-  const settings = loadSettings();
-  // AI Overview (parallel, only if enabled)
-  const overviewEl = document.getElementById('z-overview');
-  if (settings.overview && overviewEl) renderOverview(overviewEl, state.q);
-  try {
-    const t0 = performance.now();
-    const resp = await search({
-      q: state.q,
-      facets: true,
-      limit: 20,
-      type: state.type ? [state.type] : undefined,
-      semantic: state.semantic || undefined,
-      fuzzy: state.fuzzy,
-    });
-    const ms = Math.round(performance.now() - t0);
-    (window as any).__lastSearchMs = ms;
-    results.render(resp, state.q, ms);
-  } catch (e) {
-    const err = e as Error;
-    const isNet = err.message.includes('fetch') || err.message.includes('Failed to fetch') || err.message.includes('Network');
-    const friendly = isNet
-      ? 'Cannot reach the search service. Is the API running?'
-      : err.message || 'Something went wrong while searching.';
-    results.setError(friendly, () => doSearch());
-  } finally {
-    state.loading = false;
-  }
+export function navigate(url: string, replace = false): void {
+  if (replace) history.replaceState({}, '', url);
+  else history.pushState({}, '', url);
+  void route();
 }
 
-// ---------- Boot / routing ----------
-function clearOverlay() {
-  root.querySelectorAll('.z-overlay-page').forEach((n) => n.remove());
-  main.style.display = '';
-  results.el.style.display = '';
+function setTitle(title: string): void {
+  topbar.querySelector('#z-view-title')!.textContent = title;
+  document.title = title ? `${title} · Zwep` : 'Zwep — self-hosted search';
 }
 
-// ---------- Settings (persisted in localStorage) ----------
-interface ZwepSettings {
-  theme: 'light' | 'dark';
-  semantic: boolean;
-  overview: boolean;
-  llmProvider: 'ollama' | 'openrouter' | 'none';
-  ollamaModel: string;
-  openrouterModel: string;
-  openrouterKey: string;
-}
-const SETTINGS_KEY = 'zwep.settings';
-const DEFAULT_SETTINGS: ZwepSettings = {
-  theme: 'light',
-  semantic: false,
-  overview: false,
-  llmProvider: 'none',
-  ollamaModel: 'llama3.1',
-  openrouterModel: 'openai/gpt-4o-mini',
-  openrouterKey: '',
-};
-function loadSettings(): ZwepSettings {
-  try {
-    const raw = localStorage.getItem(SETTINGS_KEY);
-    if (raw) return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
-  } catch {}
-  return { ...DEFAULT_SETTINGS };
-}
-function saveSettings(s: ZwepSettings) {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
-}
+async function route(): Promise<void> {
+  viewDisposables.dispose();
+  searchAbort?.abort();
+  document.querySelector('.z-overlay')?.remove();
+  document.body.classList.remove('z-no-scroll');
 
-const OLLAMA_PRESETS = ['llama3.1', 'llama3.1:70b', 'qwen2.5', 'mistral', 'phi3'];
-const OR_PRESETS = ['openai/gpt-4o-mini', 'openai/gpt-4o', 'anthropic/claude-3.5-sonnet', 'meta-llama/llama-3.1-70b-instruct', 'google/gemini-flash-1.5'];
-
-function renderSettings() {
-  clearOverlay();
-  main.style.display = 'none';
-  results.el.style.display = 'none';
-  const s = loadSettings();
-  const wrap = document.createElement('div');
-  wrap.className = 'z-overlay-page z-settings';
-  wrap.appendChild(renderTopBar({ back: true, title: 'Settings' }));
-  const card = document.createElement('div');
-  card.className = 'z-settings__card';
-  card.innerHTML = `
-    <div class="z-field z-field--row">
-      <span>Appearance</span>
-      <button class="z-btn" id="set-theme">Switch to ${s.theme === 'dark' ? 'light' : 'dark'}</button>
-    </div>
-    <div class="z-field z-field--row">
-      <span>Semantic search <small>Hybrid vector search (needs embedding provider)</small></span>
-      <label class="z-switch"><input type="checkbox" id="set-semantic" ${s.semantic ? 'checked' : ''}><span></span></label>
-    </div>
-    <hr class="z-settings__hr" />
-    <h4 class="z-settings__h">AI Overview</h4>
-    <div class="z-field z-field--row">
-      <span>Enable AI Overview <small>Summarize curated results via LLM</small></span>
-      <label class="z-switch"><input type="checkbox" id="set-overview" ${s.overview ? 'checked' : ''}><span></span></label>
-    </div>
-    <div class="z-field">
-      <span>LLM Provider</span>
-      <select id="set-llm">
-        <option value="none" ${s.llmProvider === 'none' ? 'selected' : ''}>None (disabled)</option>
-        <option value="ollama" ${s.llmProvider === 'ollama' ? 'selected' : ''}>Ollama (local)</option>
-        <option value="openrouter" ${s.llmProvider === 'openrouter' ? 'selected' : ''}>OpenRouter (cloud)</option>
-      </select>
-    </div>
-    <div class="z-field" data-prev="ollama" style="${s.llmProvider === 'ollama' ? '' : 'display:none'}">
-      <span>Ollama Model <small id="ollama-status">loading…</small></span>
-      <select id="set-ollama-model"></select>
-      <input class="z-settings__custom" id="set-ollama-custom" placeholder="Custom model…" value="${s.ollamaModel && !OLLAMA_PRESETS.includes(s.ollamaModel) ? s.ollamaModel : ''}" />
-    </div>
-    <div class="z-field" data-prev="openrouter" style="${s.llmProvider === 'openrouter' ? '' : 'display:none'}">
-      <span>OpenRouter Model <small id="or-status">loading…</small></span>
-      <select id="set-or-model"></select>
-      <input class="z-settings__custom" id="set-or-custom" placeholder="Custom model…" value="${s.openrouterModel && !OR_PRESETS.includes(s.openrouterModel) ? s.openrouterModel : ''}" />
-      <span>OpenRouter API Key</span>
-      <input type="password" id="set-or-key" placeholder="sk-or-…" value="${s.openrouterKey}" />
-    </div>
-    <p class="z-hint">Settings are stored in your browser (localStorage). For server-wide defaults, set LLM_PROVIDER / OPENROUTER_LLM_KEY in .env.</p>
-    <div class="z-field z-field--row">
-      <span>Sources</span>
-      <a class="z-btn z-btn--primary" href="/admin" data-admin>Manage sources →</a>
-    </div>`;
-  wrap.appendChild(card);
-  root.appendChild(wrap);
-
-  const persist = () => {
-    const next: ZwepSettings = {
-      ...s,
-      semantic: (wrap.querySelector('#set-semantic') as HTMLInputElement).checked,
-      overview: (wrap.querySelector('#set-overview') as HTMLInputElement).checked,
-      llmProvider: (wrap.querySelector('#set-llm') as HTMLSelectElement).value as ZwepSettings['llmProvider'],
-      ollamaModel: customOrSelect(wrap, '#set-ollama-model', '#set-ollama-custom', s.ollamaModel),
-      openrouterModel: customOrSelect(wrap, '#set-or-model', '#set-or-custom', s.openrouterModel),
-      openrouterKey: (wrap.querySelector('#set-or-key') as HTMLInputElement).value,
-    };
-    saveSettings(next);
-    state.semantic = next.semantic;
-    // notify backend: if overview on, push key to .env-less runtime via localStorage only (backend reads .env)
-    syncBackendSettings(next);
-  };
-
-  wrap.querySelector('#set-theme')!.addEventListener('click', () => {
-    const next = s.theme === 'dark' ? 'light' : 'dark';
-    applyTheme(next);
-    const upd = { ...loadSettings(), theme: next };
-    saveSettings(upd);
-    renderSettings();
-  });
-  wrap.querySelector('#set-semantic')!.addEventListener('change', persist);
-  wrap.querySelector('#set-overview')!.addEventListener('change', persist);
-  wrap.querySelector('#set-llm')!.addEventListener('change', () => {
-    const v = (wrap.querySelector('#set-llm') as HTMLSelectElement).value;
-    wrap.querySelectorAll('[data-prev]').forEach((el) => {
-      (el as HTMLElement).style.display = (el as HTMLElement).dataset.prev === v ? '' : 'none';
-    });
-    persist();
-  });
-  wrap.querySelector('#set-ollama-model')!.addEventListener('change', (e) => {
-    if ((e.target as HTMLSelectElement).value === '__custom') {
-      const c = wrap.querySelector('#set-ollama-custom') as HTMLInputElement;
-      c.value = '';
-      c.focus();
-    }
-    persist();
-  });
-  wrap.querySelector('#set-ollama-custom')!.addEventListener('input', persist);
-  wrap.querySelector('#set-or-model')!.addEventListener('change', (e) => {
-    if ((e.target as HTMLSelectElement).value === '__custom') {
-      const c = wrap.querySelector('#set-or-custom') as HTMLInputElement;
-      c.value = '';
-      c.focus();
-    }
-    persist();
-  });
-  wrap.querySelector('#set-or-key')!.addEventListener('input', persist);
-  wrap.querySelector('[data-admin]')!.addEventListener('click', (e) => {
-    e.preventDefault();
-    history.pushState({}, '', '/admin');
-    route();
-  });
-
-  // async-load available models into the dropdowns
-  loadModelDropdowns(wrap, s);
-}
-
-function customOrSelect(wrap: HTMLElement, sel: string, custom: string, fallback: string): string {
-  const c = (wrap.querySelector(custom) as HTMLInputElement).value.trim();
-  if (c) return c;
-  const s = (wrap.querySelector(sel) as HTMLSelectElement).value;
-  return s || fallback;
-}
-
-/** Fetch installed/free models and populate the provider dropdowns. */
-async function loadModelDropdowns(wrap: HTMLElement, s: ZwepSettings) {
-  const ollamaSel = wrap.querySelector('#set-ollama-model') as HTMLSelectElement | null;
-  const orSel = wrap.querySelector('#set-or-model') as HTMLSelectElement | null;
-  const ollamaStatus = wrap.querySelector('#ollama-status') as HTMLElement | null;
-  const orStatus = wrap.querySelector('#or-status') as HTMLElement | null;
-
-  // Ollama: locally installed models
-  if (ollamaSel) {
-    try {
-      const models = await ollamaModels();
-      if (models.length) {
-        const opts = models.map((m) => {
-          const selected = m.id === s.ollamaModel ? 'selected' : '';
-          const label = m.size ? `${m.name} (${(m.size / 1e9).toFixed(1)}GB)` : m.name;
-          return `<option value="${escapeHtml(m.id)}" ${selected}>${escapeHtml(label)}</option>`;
-        });
-        // keep presets that aren't installed, plus a custom entry
-        ollamaSel.innerHTML = opts.join('') + OLLAMA_PRESETS.filter((p) => !models.some((m) => m.id === p)).map((p) => `<option value="${p}" ${p === s.ollamaModel ? 'selected' : ''}>${p}</option>`).join('') + `<option value="__custom" ${!models.some((m) => m.id === s.ollamaModel) && !OLLAMA_PRESETS.includes(s.ollamaModel) ? 'selected' : ''}>Custom…</option>`;
-        if (ollamaStatus) ollamaStatus.textContent = `${models.length} installed`;
-      } else {
-        ollamaSel.innerHTML = OLLAMA_PRESETS.map((p) => `<option value="${p}" ${p === s.ollamaModel ? 'selected' : ''}>${p}</option>`).join('') + `<option value="__custom">Custom…</option>`;
-        if (ollamaStatus) ollamaStatus.textContent = 'Ollama offline — presets only';
-      }
-    } catch {
-      if (ollamaStatus) ollamaStatus.textContent = 'unavailable';
-    }
-  }
-
-  // OpenRouter: all available models
-  if (orSel) {
-    try {
-      const models = await openrouterModels();
-      if (models.length) {
-        const opts = models.map((m) => {
-          const selected = m.id === s.openrouterModel ? 'selected' : '';
-          const label = m.context_length ? `${m.name} (${m.context_length.toLocaleString()} ctx)` : m.name;
-          return `<option value="${escapeHtml(m.id)}" ${selected}>${escapeHtml(label)}</option>`;
-        });
-        orSel.innerHTML = opts.join('') + `<option value="__custom" ${!models.some((m) => m.id === s.openrouterModel) && !OR_PRESETS.includes(s.openrouterModel) ? 'selected' : ''}>Custom…</option>`;
-        if (orStatus) orStatus.textContent = `${models.length} available`;
-      } else {
-        orSel.innerHTML = OR_PRESETS.map((p) => `<option value="${p}" ${p === s.openrouterModel ? 'selected' : ''}>${p}</option>`).join('') + `<option value="__custom">Custom…</option>`;
-        if (orStatus) orStatus.textContent = 'no models — presets only';
-      }
-    } catch {
-      if (orStatus) orStatus.textContent = 'unavailable';
-    }
-  }
-}
-
-/** Push user LLM settings to the backend at runtime (no restart needed). */
-async function syncBackendSettings(s: ZwepSettings) {
-  try {
-    await fetch('/v1/settings', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        llmProvider: s.llmProvider,
-        ollamaLlmModel: s.ollamaModel,
-        openrouterLlmModel: s.openrouterModel,
-        openrouterLlmKey: s.openrouterKey,
-      }),
-    });
-  } catch {}
-}
-
-function route() {
-  // tear down any overlay page
-  root.querySelectorAll('.z-overlay-page').forEach((n) => n.remove());
   const path = location.pathname;
-  if (path.startsWith('/admin')) {
-    const admin = new AdminView();
-    results.el.style.display = 'none';
-    main.style.display = 'none';
-    root.appendChild(renderTopBar({ back: true, title: 'Library' }));
-    root.appendChild(admin.el);
-    admin.mount().catch(() => {});
-    window.addEventListener('popstate', () => admin.unmount(), { once: true });
+  const params = new URLSearchParams(location.search);
+
+  // `/admin` is kept as an alias so old bookmarks keep working.
+  if (path.startsWith('/library') || path.startsWith('/admin')) {
+    setTitle('Library');
+    main.className = 'z-main';
+    main.innerHTML = '';
+    const view = new LibraryView();
+    main.appendChild(view.el);
+    viewDisposables.add(() => view.destroy());
+    await view.mount();
     return;
   }
+
   if (path.startsWith('/settings')) {
-    renderSettings();
+    setTitle('Settings');
+    main.className = 'z-main';
+    main.innerHTML = '';
+    const teardown = renderSettings(main);
+    viewDisposables.add(teardown);
     return;
   }
-  main.style.display = '';
-  const initialQ = new URLSearchParams(location.search).get('q');
-  if (initialQ) {
-    searchBar.setValue(initialQ);
-    state.q = initialQ;
-    const initialType = new URLSearchParams(location.search).get('type');
-    state.type = initialType || '';
-    doSearch();
-  } else {
-    renderHome();
+
+  state.q = params.get('q') ?? '';
+  state.type = params.get('type') ?? '';
+  state.offset = Number(params.get('offset')) || 0;
+  state.view = params.get('view') === 'graph' ? 'graph' : 'results';
+  state.facets = new Map(
+    [...params.entries()].filter(([k]) => k.startsWith('f_')).map(([k, v]) => [k.slice(2), v]),
+  );
+
+  if (!state.q) {
+    setTitle('');
+    return renderHome();
   }
+  setTitle(state.q);
+  if (state.view === 'graph') return showGraph();
+  return runSearch();
 }
 
-route();
+window.addEventListener('popstate', () => void route());
 
-// apply persisted settings on boot
-(function applyBootSettings() {
-  const s = loadSettings();
-  applyTheme(s.theme);
-  state.semantic = s.semantic;
-  if (s.llmProvider !== 'none') {
-    // push to backend so AI Overview works without .env restart
-    syncBackendSettings(s);
+// ---------------------------------------------------------------------------
+// Global keyboard shortcuts
+// ---------------------------------------------------------------------------
+
+document.addEventListener('keydown', (e) => {
+  const typing = ['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement)?.tagName);
+  if (e.key === '/' && !typing) {
+    e.preventDefault();
+    searchBar.focus();
   }
-})();
-
-footer.querySelector('#nav-admin')!.addEventListener('click', (e) => {
-  e.preventDefault();
-  history.pushState({}, '', '/admin');
-  route();
-});
-footer.querySelector('#nav-settings')!.addEventListener('click', (e) => {
-  e.preventDefault();
-  history.pushState({}, '', '/settings');
-  route();
+  if (e.key === 'Escape' && typing && (e.target as HTMLElement).tagName === 'INPUT') {
+    (e.target as HTMLInputElement).blur();
+  }
+  if (e.key === 'g' && !typing && state.q) {
+    state.view = state.view === 'graph' ? 'results' : 'graph';
+    navigate(searchUrl());
+  }
 });
 
-// show indexed count in footer tag after stats resolves
+// ---------------------------------------------------------------------------
+// Boot
+// ---------------------------------------------------------------------------
+
+void route();
+
 stats()
   .then((s) => {
-    const tag = footer.querySelector('.z-footer__tag');
-    if (tag && s.ok) tag.textContent = `${s.indexed} documents indexed. Search what you curate.`;
+    const tag = footer.querySelector('#z-footer-tag');
+    if (!tag || !s.ok) return;
+    tag.innerHTML =
+      `<strong>${s.indexed.toLocaleString()}</strong> documents · ` +
+      `<strong>${s.sourcesEnabled}</strong> of ${s.sources} sources active`;
   })
-  .catch(() => {});
+  .catch((e) => {
+    const tag = footer.querySelector('#z-footer-tag');
+    if (!tag) return;
+    // "API offline" and "the API is up but Meilisearch is not" need different
+    // commands to fix, so they must not share a message.
+    const indexDown = e instanceof ApiError && e.code === 'index_unavailable';
+    const [label, hint] = indexDown
+      ? ['Index unavailable', 'npm run infra:up']
+      : ['API offline', 'npm run dev'];
+    tag.innerHTML = `<span class="z-footer__warn">${label}</span> — run <code>${escapeHtml(hint)}</code>`;
+  });

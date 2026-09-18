@@ -1,0 +1,31 @@
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels: [dependencies]
+    commit-message:
+      prefix: 'chore(deps)'
+      prefix-development: 'chore(deps-dev)'
+    groups:
+      # One PR for the whole dev toolchain instead of five separate ones.
+      dev-tooling:
+        dependency-type: development
+        patterns: ['*']
+      # Patch and minor runtime bumps travel together; majors stay separate so
+      # a breaking change is reviewed on its own.
+      runtime-minor:
+        dependency-type: production
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    labels: [dependencies, ci]
+    commit-message:
+      prefix: 'chore(ci)'
