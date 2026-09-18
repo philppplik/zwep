@@ -28,6 +28,7 @@ import {
   waitForApi,
 } from '../cli/local.mjs';
 import { checkForUpdate, updateCommand } from '../cli/update.mjs';
+import { runDoctor, hasBlockingProblem } from '../cli/doctor.mjs';
 import {
   banner,
   box,
@@ -432,6 +433,68 @@ const commands = {
     }
   },
 
+  /** Check the machine and say what to do about each problem. */
+  async doctor() {
+    const spin = asJson ? null : spinner('checking this machine…');
+    const checks = await runDoctor({ base: client.base });
+    spin?.stop();
+
+    if (asJson) {
+      return emit(null, { ok: !hasBlockingProblem(checks), checks });
+    }
+
+    out(banner('setup check'));
+
+    const glyph = {
+      ok: c.green('✓'),
+      warn: c.yellow('!'),
+      fail: c.red('✗'),
+      skip: c.dim('–'),
+    };
+
+    for (const check of checks) {
+      out(`${glyph[check.status]} ${c.bold(check.name.padEnd(14))} ${c.dim(check.detail)}`);
+      if (!check.fix?.length) continue;
+      out('');
+      for (const line of check.fix) {
+        if (!line.trim()) {
+          out('');
+          continue;
+        }
+        // Keep the author's relative indentation — it is what makes nested
+        // options (a/b) readable — and highlight anything that looks like a
+        // command, because copying the next step is the whole point.
+        const isCommand = /^(npm|npx|node|zwep|git|cd|curl|copy|cp|docker|meilisearch|sudo)\b/.test(
+          line.trim(),
+        );
+        const body = isCommand ? c.cyan(line.trim()) : c.dim(line.trim());
+        const indent = ' '.repeat(4 + (line.length - line.trimStart().length));
+        out(indent + body);
+      }
+      out('');
+    }
+
+    out(rule());
+    const failed = checks.filter((x) => x.status === 'fail');
+    const warned = checks.filter((x) => x.status === 'warn');
+
+    if (!failed.length && !warned.length) {
+      out(`${symbols.ok} Everything checks out. Try: ${c.bold('zwep search "hello"')}`);
+      return;
+    }
+    if (!failed.length) {
+      out(
+        `${symbols.ok} Zwep will work. ${warned.length} optional thing${warned.length === 1 ? '' : 's'} could be improved.`,
+      );
+      return;
+    }
+    out(
+      `${symbols.err} ${failed.length} problem${failed.length === 1 ? '' : 's'} ` +
+        `${failed.length === 1 ? 'stops' : 'stop'} Zwep from working: ${failed.map((x) => x.name).join(', ')}`,
+    );
+    out(c.dim('   Follow the steps above, then run this again.'));
+  },
+
   async sources() {
     const sub = positional[1] ?? 'list';
     if (sub === 'list') {
@@ -640,6 +703,9 @@ const commands = {
         '  graph <term>          Knowledge-graph neighbourhood',
         '  repl                  Interactive search session',
         '',
+        c.bold('SETUP'),
+        '  doctor                Check this machine and explain every problem',
+        '',
         c.bold('SERVER'),
         '  up [--web]            Start a local Zwep in the background',
         '  down                  Stop the Zwep this CLI started',
@@ -710,6 +776,9 @@ const ALIASES = {
   serve: 'up',
   stop: 'down',
   upgrade: 'update',
+  check: 'doctor',
+  diagnose: 'doctor',
+  setup: 'doctor',
 };
 
 /** Commands that talk to the API, and therefore want it running first. */
@@ -752,7 +821,20 @@ async function main() {
 
   const name = ALIASES[command] ?? command;
   const fn = commands[name];
-  if (!fn) die(`Unknown command: ${command}. Run 'zwep help'.`, 2);
+  if (!fn) {
+    const known = [...Object.keys(commands), ...Object.keys(ALIASES)];
+    const near = known.filter((k) => k.startsWith(name[0]) || k.includes(name) || name.includes(k));
+    die(
+      `Unknown command: ${command}` +
+        (near.length
+          ? `
+  Did you mean: ${near.slice(0, 4).join(', ')}?`
+          : '') +
+        `
+  Run ${c.bold('zwep help')} for all commands, or ${c.bold('zwep doctor')} to check your setup.`,
+      2,
+    );
+  }
 
   if (NEEDS_API.has(name)) await ensureApi();
   await fn();

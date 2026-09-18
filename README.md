@@ -123,8 +123,12 @@ different index than you asked for.
 ### 2. The search engine itself — from source
 
 This is the crawler, indexer, API and web UI. It needs
-[Node 22.6+](https://nodejs.org) and [Docker](https://docs.docker.com/get-docker/)
-(for Meilisearch). Works on Windows, macOS and Linux.
+**[Node 22.6+](https://nodejs.org)** and **Meilisearch**. Works on Windows,
+macOS and Linux.
+
+Docker is the easiest way to get Meilisearch, but it is **not required** — a
+standalone binary works just as well. `zwep doctor` shows the steps for your
+platform either way.
 
 ```bash
 # Get the code
@@ -135,7 +139,7 @@ npm install
 # Configure — the defaults work for local development
 cp .env.example .env
 
-# Start Meilisearch and Redis
+# Start Meilisearch (needs Docker; see below if you do not have it)
 npm run infra:up
 
 # Start the API (:8080) and the web UI (:5173)
@@ -185,20 +189,48 @@ Redis is optional today — the crawler runs inline.
 
 </details>
 
+### Something not working? Ask the tool
+
+```bash
+npx zwep doctor
+```
+
+It checks Node, the engine, `.env`, Docker, Meilisearch, the API and the ports —
+and for anything wrong, prints **the exact command that fixes it**. It also
+separates *optional* from *required*, so a missing Docker does not read like a
+broken install.
+
+```console
+✗ Meilisearch    not reachable at http://127.0.0.1:7700
+
+    Nothing is answering at http://127.0.0.1:7700. Pick whichever suits you:
+
+      Docker is NOT installed. Either:
+
+      a) Install Docker Desktop, then `npm run infra:up`
+         https://docs.docker.com/get-docker/
+
+      b) Run Meilisearch directly, no Docker needed:
+         curl -L https://install.meilisearch.com | sh
+         meilisearch --master-key=zwep_dev_master_key_change_me
+```
+
 <details>
-<summary><b>Troubleshooting</b></summary>
+<summary><b>Troubleshooting table</b></summary>
 
 | Symptom | Cause and fix |
 | --- | --- |
 | Search returns 500, or the Library shows `ECONNREFUSED` | The API is not running. The web UI proxies `/v1/*` to port 8080. Use `npm run dev`, which starts both. |
 | `index_unavailable` | Meilisearch is unreachable. Run `npm run infra:up`, then check <http://localhost:7700/health>. |
+| `docker` not found on `npm run infra:up` | **Docker is optional.** Meilisearch also ships a standalone binary — `zwep doctor` prints the steps for your platform. |
+| `EADDRINUSE`, or the API exits at once | Something already has the port: `API_PORT=8081 npm run dev`. Or it is Zwep itself — check with `zwep status`. |
 | Library says "Admin key required" | Set it under Settings → Admin access. In development it is `zwep_admin_dev_key`. |
 | A crawl indexes 0 documents | The source's `allowedDomains` may not cover the seed's host, or `robots.txt` disallows `ZwepBot`. Run `zwep crawl <source> --json` to see `skipped` versus `failed`. |
 | `zwep: command not found` | `npm install -g zwep`, or use `npx zwep`. |
 | AI overview never appears | It is off by default. Enable it in Settings and pick a provider. For `ollama`, make sure `ollama serve` is running. |
 
-Still stuck? `zwep status --json` prints what Zwep believes its state is —
-include it when you
+Still stuck? `zwep doctor --json` and `zwep status --json` print everything Zwep
+knows about its own state — include them when you
 [open an issue](https://github.com/philppplik/zwep/issues/new/choose).
 
 </details>
@@ -261,6 +293,9 @@ SEARCH
   overview <query>      AI summary of the top results
   graph <term>          Knowledge-graph neighbourhood
   repl                  Interactive search session
+
+SETUP
+  doctor                Check this machine and explain every problem
 
 SERVER
   up [--web]            Start a local Zwep in the background

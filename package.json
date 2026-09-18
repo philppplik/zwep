@@ -1,6 +1,6 @@
 {
   "name": "zwep",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Command line and MCP server for Zwep — a small, self-hosted search engine over the sources you curate.",
   "license": "MIT",
   "author": "Philipp Paulik (https://github.com/philppplik)",
@@ -64,8 +64,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "verify": "npm run lint && npm run typecheck && npm run test",
-    "infra:up": "docker compose up -d meilisearch redis",
-    "infra:down": "docker compose down",
+    "infra:up": "node scripts/infra.mjs up",
+    "infra:down": "node scripts/infra.mjs down",
     "prepublishOnly": "npm run verify"
   },
   "devDependencies": {

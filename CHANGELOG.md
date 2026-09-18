@@ -7,6 +7,37 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.3.1] — 2026-09-18
+
+### Fixed
+
+- **`npm run dev` never started on Windows.** The runner spawned children with
+  `shell: true`, which concatenates the command and its arguments into one
+  string *without quoting them*. Node's default install path is
+  `C:\Program Files\nodejs\node.exe`, so cmd.exe split it at the space and
+  reported `'C:\Program' is not recognized` — on every Windows machine with a
+  default Node install. Nothing uses a shell any more: both children launch as
+  `node <script>`, which needs none and cannot be mis-split. This also removes
+  the `DEP0190` deprecation warning.
+
+### Added
+
+- **`zwep doctor`.** Checks Node, the engine, `.env`, Docker, Meilisearch, the
+  API and the ports, and prints the exact command that fixes anything wrong. It
+  separates optional from required, so a missing Docker no longer reads like a
+  broken install. `--json` for scripts and agents.
+- `npm run infra:up` explains itself when Docker is missing instead of failing
+  with the shell's `'docker' is not recognized`. Docker is one way to run
+  Meilisearch, not the only one, and the message now says so and gives the
+  platform-specific alternative.
+- The API turns startup failures into explanations. `EADDRINUSE` prints the
+  port, how to check whether it is Zwep itself, and how to use another port —
+  instead of a Node stack trace. `ZWEP_DEBUG=1` still shows the stack.
+- The dev runner explains why the API exited, warns when Meilisearch is
+  unreachable before you hit a 503, and detects missing dependencies.
+- An unknown CLI command suggests the closest real one.
+- `zwep check`, `zwep diagnose` and `zwep setup` alias `zwep doctor`.
+
 ## [0.3.0] — 2026-09-18
 
 ### Added
@@ -181,6 +212,7 @@ features not work at all.
 - `scripts/probe-google.ts` and `scripts/smoke-admin.ts`, superseded by the
   test suite.
 
-[Unreleased]: https://github.com/philppplik/zwep/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/philppplik/zwep/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/philppplik/zwep/releases/tag/v0.3.1
 [0.3.0]: https://github.com/philppplik/zwep/releases/tag/v0.3.0
 [0.2.0]: https://github.com/philppplik/zwep/releases/tag/v0.2.0
