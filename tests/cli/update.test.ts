@@ -2,7 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { checkForUpdate, isNewer, updateCheckDisabled, updateCommand } from '../../cli/update.mjs';
+import {
+  checkForUpdate,
+  isNewer,
+  isValidVersion,
+  updateCheckDisabled,
+  updateCommand,
+} from '../../cli/update.mjs';
 
 let dir: string;
 
@@ -158,5 +164,45 @@ describe('checkForUpdate', () => {
       vi.fn(async () => new Response('{}')),
     );
     expect((await checkForUpdate({ current: '0.2.0' })).checked).toBe(false);
+  });
+});
+
+describe('isValidVersion — guards what reaches disk and the terminal', () => {
+  it.each(['1.0.0', '0.2.0', '10.20.30', '1.0.0-rc.1', '1.0.0+build.5', '1.2'])(
+    'accepts %s',
+    (v) => {
+      expect(isValidVersion(v)).toBe(true);
+    },
+  );
+
+  it.each([
+    '',
+    'latest',
+    '1.0.0; rm -rf /',
+    '../../../etc/passwd',
+    '1.0.0\n[llm] forged log line',
+    '9'.repeat(100),
+    null,
+    undefined,
+    { version: '1.0.0' },
+  ])('rejects %s', (v) => {
+    expect(isValidVersion(v as string)).toBe(false);
+  });
+
+  it('rejects a version carrying ANSI escapes', () => {
+    // The version is printed to a terminal; escapes could rewrite the notice.
+    expect(isValidVersion(`1.0.0${String.fromCharCode(27)}[31m`)).toBe(false);
+  });
+});
+
+describe('checkForUpdate rejects a malformed registry version', () => {
+  it('does not persist or report a version that fails validation', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify({ version: 'not-a-version' }))),
+    );
+    const r = await checkForUpdate({ current: '0.2.0' });
+    expect(r.checked).toBe(false);
+    expect(r).not.toHaveProperty('latest');
   });
 });

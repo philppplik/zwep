@@ -29,6 +29,19 @@ export const VERSION: string = (() => {
   }
 })();
 
+/**
+ * A plausible semver string, and nothing else.
+ *
+ * The registry's answer is network data that is cached and returned to every
+ * browser that opens Settings. Validating the shape first keeps a hostile or
+ * malfunctioning registry from putting arbitrary content into that response.
+ */
+const VERSION_RE = /^\d{1,6}(\.\d{1,6}){0,3}(-[0-9A-Za-z.-]{1,32})?(\+[0-9A-Za-z.-]{1,32})?$/;
+
+export function isValidVersion(v: unknown): v is string {
+  return typeof v === 'string' && VERSION_RE.test(v);
+}
+
 /** Compare two semver-ish strings; true when `candidate` is newer. */
 export function isNewer(candidate: string, current: string): boolean {
   const parse = (v: string) =>
@@ -79,8 +92,8 @@ export async function checkForUpdate(force = false): Promise<UpdateStatus> {
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     if (!res.ok) throw new Error(`registry returned ${res.status}`);
-    const data = (await res.json()) as { version?: string };
-    if (!data.version) throw new Error('registry returned no version');
+    const data = (await res.json()) as { version?: unknown };
+    if (!isValidVersion(data.version)) throw new Error('registry returned no usable version');
 
     cached = { latest: data.version, at: Date.now() };
     return {

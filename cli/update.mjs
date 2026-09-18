@@ -40,6 +40,20 @@ export function isNewer(candidate, current) {
   return preB && !preA;
 }
 
+/**
+ * A plausible semver string, and nothing else.
+ *
+ * The registry's answer is network data that ends up written to disk and
+ * printed to a terminal. Validating the shape before either happens keeps a
+ * hostile or malfunctioning registry from persisting arbitrary content, or from
+ * smuggling ANSI escapes into the update notice.
+ */
+const VERSION_RE = /^\d{1,6}(\.\d{1,6}){0,3}(-[0-9A-Za-z.-]{1,32})?(\+[0-9A-Za-z.-]{1,32})?$/;
+
+export function isValidVersion(v) {
+  return typeof v === 'string' && VERSION_RE.test(v);
+}
+
 /** Ask the registry for the latest published version. */
 export async function fetchLatest(pkg = 'zwep', timeoutMs = 5000) {
   const res = await fetch(`${REGISTRY}/${pkg}/latest`, {
@@ -48,8 +62,8 @@ export async function fetchLatest(pkg = 'zwep', timeoutMs = 5000) {
   });
   if (!res.ok) throw new Error(`registry returned ${res.status}`);
   const data = await res.json();
-  if (!data?.version) throw new Error('registry returned no version');
-  return { version: data.version, name: data.name ?? pkg };
+  if (!isValidVersion(data?.version)) throw new Error('registry returned no usable version');
+  return { version: data.version };
 }
 
 function readCache() {
@@ -86,7 +100,13 @@ export async function checkForUpdate({ current, force = false }) {
   }
 
   const cache = readCache();
-  const fresh = cache && Date.now() - cache.checkedAt < CHECK_EVERY_MS;
+  // Re-validate on read: the cache file is on disk and could have been edited,
+  // and a stale format from an older release should not reach the renderer.
+  const fresh =
+    cache &&
+    isValidVersion(cache.latest) &&
+    typeof cache.checkedAt === 'number' &&
+    Date.now() - cache.checkedAt < CHECK_EVERY_MS;
   if (fresh && !force) {
     return {
       checked: true,
