@@ -22,7 +22,7 @@ features not work at all.
 - **MCP server (`zwep mcp`).** Exposes the index to any MCP-capable agent over
   stdio as JSON-RPC, with no dependencies. Read-only by default; the crawl
   tools require both `--allow-write` and an admin key.
-- **Test suite.** 247 tests across three Vitest projects — services and
+- **Test suite.** 259 tests across three Vitest projects — services and
   packages, jsdom component behaviour, and the CLI/MCP protocol. No test needs
   a network or a running Meilisearch.
 - **CI.** Lint, formatting, types and the full suite on Ubuntu, Windows and
@@ -100,6 +100,17 @@ features not work at all.
   Zwep's premise is that queries never leave your infrastructure, but a font
   CDN receives every page view — and the referrer carries the search query.
 - `npm audit` reports zero vulnerabilities, down from seven.
+- Fixed three findings from a CodeQL scan:
+  - `isGoogleOwned` used a bare suffix check, which also matches a look-alike
+    host such as `evilgoogle.com` — so one was classified as Google's own
+    infrastructure. It now matches the registrable domain or a subdomain of it.
+  - The knowledge graph trimmed separators from entity ids with a regular
+    expression that backtracks polynomially. The input is crawled page text, so
+    a page of punctuation was a cheap way to stall a crawl.
+  - Provider error bodies reached the log verbatim, so a response containing a
+    newline could forge log entries. Untrusted text now goes through
+    `oneLine()`, and the LLM provider name is a validated union rather than an
+    arbitrary string.
 
 ### Changed
 
