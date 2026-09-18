@@ -4,72 +4,130 @@
 
 # Zwep
 
-**A small, self-hosted search engine.**
-Crawl what you curate. Search it in milliseconds. Nothing leaves your machine.
+**A search engine for the sources you trust — and nothing else.**
+
+Zwep crawls a list of sites you choose, builds its own index, and answers your
+searches from it. No ads, no SEO spam, no tracking. It runs on your machine, and
+your queries never leave it.
 
 [![CI](https://github.com/philppplik/zwep/actions/workflows/ci.yml/badge.svg)](https://github.com/philppplik/zwep/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/philppplik/zwep/actions/workflows/codeql.yml/badge.svg)](https://github.com/philppplik/zwep/actions/workflows/codeql.yml)
+[![npm](https://img.shields.io/npm/v/zwep.svg)](https://www.npmjs.com/package/zwep)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%E2%89%A522.6-green.svg)](.nvmrc)
 
-[Quickstart](#quickstart) · [Why](#why-zwep-exists) · [CLI](#the-command-line) ·
-[For AI agents](#for-ai-agents) · [Docs](#documentation) · [Contributing](CONTRIBUTING.md)
+[What is this?](#what-is-this) · [Is it for you?](#is-zwep-for-you) ·
+[Install](#install) · [Usage](#usage) · [For AI agents](#for-ai-agents) ·
+[Docs](#documentation)
 
 </div>
 
 ---
 
-## Why Zwep exists
+## What is this?
 
-General web search optimises for everyone, which means it optimises for nobody
-in particular. If the fifty sites you actually trust are buried under SEO spam,
-the problem is not ranking — it is the corpus.
+Web search optimises for the average query across billions of people. That makes
+it very good at "weather tomorrow" and increasingly bad at finding the fifty
+sites you actually rely on — those are buried under content farms optimised to
+rank, not to be right.
 
-Zwep inverts that. **You** choose the corpus. It crawls that set, builds its own
-index, and answers queries from it. The result is a search engine where every
-hit is from a source you vouched for.
+Zwep flips the problem around. **You pick the corpus.** Add the sites that
+matter to you; Zwep crawls them, extracts clean text, scores each page for
+quality, and gives you a fast, faceted search over exactly that material. Every
+result comes from something you vouched for.
 
-- **Focused, not the whole web.** You define what gets crawled.
-- **Private by construction.** Queries are answered locally. The UI loads no
-  third-party scripts, analytics or fonts.
-- **Yours to rank.** Tune relevance, recency, quality weighting and facets.
-- **API-first.** One stable REST contract. The web UI, the CLI and any agent
-  are all just clients.
-- **Small.** The whole UI is ~18 kB gzipped, with no framework.
+It is three things in one repository:
 
-Zwep respects `robots.txt`, rate-limits itself, and identifies as `ZwepBot/1.0`.
-It is **not** a general-purpose scraper.
+| | |
+| --- | --- |
+| **A crawler and indexer** | Fetches your sources politely, extracts text and metadata, and indexes it in Meilisearch |
+| **A search API and web UI** | A clean REST API with a fast browser interface on top |
+| **A CLI and MCP server** | Search from your terminal, or give an AI agent your private corpus as a tool |
+
+Zwep respects `robots.txt`, rate-limits itself, and identifies as
+`ZwepBot/1.0`. It is **not** a general-purpose web scraper.
 
 ---
 
-## Quickstart
+## Is Zwep for you?
 
-**Prerequisites:** [Node 22.6+](https://nodejs.org) and
-[Docker](https://docs.docker.com/get-docker/). Works on Windows, macOS and Linux.
+**Yes, if you are:**
+
+- **A researcher or analyst** who keeps returning to the same 30 journals,
+  agencies or company sites, and wants one search across all of them.
+- **A developer** who wants to search a set of documentation sites without the
+  results being polluted by tutorial spam and outdated Stack Overflow copies.
+- **Someone running a publication or a site** who wants real search over their
+  own archive, with ranking they control.
+- **Building with AI agents** and tired of the agent citing a content farm. A
+  curated index means every retrieved source already passed your judgement — see
+  [For AI agents](#for-ai-agents).
+- **Privacy-minded.** Your queries are answered locally. The UI loads no
+  third-party scripts, analytics, or even web fonts.
+
+**Probably not, if you:**
+
+- Want to search the whole web. Zwep only knows what you tell it to crawl.
+- Want a hosted service you sign up for. Zwep is self-hosted, single-tenant.
+- Need multi-user accounts and per-user permissions. There is one admin key, not
+  a user model — see [SECURITY.md](SECURITY.md).
+- Want to crawl sites that forbid it. Zwep honours `robots.txt` by design.
+
+---
+
+## Install
+
+There are two pieces, and you may only want the first.
+
+### 1. The CLI and MCP server — from npm
+
+Zero dependencies, works anywhere Node runs. This is what you install to *use* a
+Zwep, or to connect an AI agent to one.
 
 ```bash
-# 1. Get the code
+npm install -g zwep
+```
+
+Or run it without installing:
+
+```bash
+npx zwep --help
+```
+
+It talks to a Zwep API over HTTP, so it works against a Zwep on your laptop, in a
+container, or on another machine:
+
+```bash
+export ZWEP_API=http://127.0.0.1:8080     # the default
+zwep status
+```
+
+### 2. The search engine itself — from source
+
+This is the crawler, indexer, API and web UI. It needs
+[Node 22.6+](https://nodejs.org) and [Docker](https://docs.docker.com/get-docker/)
+(for Meilisearch). Works on Windows, macOS and Linux.
+
+```bash
+# Get the code
 git clone https://github.com/philppplik/zwep
 cd zwep
 npm install
 
-# 2. Configure (the defaults work for local development)
+# Configure — the defaults work for local development
 cp .env.example .env
 
-# 3. Start Meilisearch and Redis
+# Start Meilisearch and Redis
 npm run infra:up
 
-# 4. Start the API (:8080) and the web UI (:5173)
+# Start the API (:8080) and the web UI (:5173)
 npm run dev
 ```
 
-Open **<http://localhost:5173>**. The first crawl takes about a minute:
+Open **<http://localhost:5173>**. Then index something:
 
 ```bash
-# Index the built-in smoke-test source
-npx zwep crawl example
-
-# Search it
+npx zwep crawl example          # the built-in smoke-test source
 npx zwep search "example domain"
 ```
 
@@ -78,122 +136,104 @@ npx zwep search "example domain"
 
 `npm run dev` is a Node script, so the same command works in PowerShell, cmd,
 Git Bash, zsh and bash. It health-checks the API before telling you the UI is
-ready and forwards Ctrl-C to both processes, including on Windows, where it
-tears down the whole process tree with `taskkill`.
+ready, and forwards Ctrl-C to both processes — including on Windows, where it
+tears down the whole process tree.
 
-**Windows:** Docker Desktop must be running before `npm run infra:up`. If
-`better-sqlite3` fails to install, install the
+**Windows:** start Docker Desktop before `npm run infra:up`. If `better-sqlite3`
+fails to build, install the
 [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
-with the "Desktop development with C++" workload, then `npm rebuild`.
+with the "Desktop development with C++" workload, then run `npm rebuild`.
 
-**macOS (Apple Silicon):** everything runs natively. Meilisearch's image is
+**macOS (Apple Silicon):** everything runs natively; Meilisearch's image is
 multi-arch.
 
-**Linux:** if Playwright's Chromium fails to launch, install its system
-dependencies with `npx playwright install-deps chromium`.
+**Linux:** if Playwright's Chromium fails to launch, run
+`npx playwright install-deps chromium`.
 
 </details>
 
 <details>
 <summary><b>Without Docker</b></summary>
 
-Zwep needs Meilisearch reachable at `MEILI_HOST`; how it gets there is up to
-you. Install it [natively](https://www.meilisearch.com/docs/learn/self_hosted/install_meilisearch_locally)
+Zwep only needs Meilisearch reachable at `MEILI_HOST`. Install it
+[natively](https://www.meilisearch.com/docs/learn/self_hosted/install_meilisearch_locally)
 and start it with a matching key:
 
 ```bash
 meilisearch --master-key=zwep_dev_master_key_change_me
 ```
 
-Redis is currently optional — the crawler runs inline.
+Redis is optional today — the crawler runs inline.
 
 </details>
 
 <details>
-<summary><b>Something is not working</b></summary>
+<summary><b>Troubleshooting</b></summary>
 
 | Symptom | Cause and fix |
 | --- | --- |
-| Search returns 500, or the Library shows `ECONNREFUSED` | The API is not running. The Vite dev server proxies `/v1/*` to port 8080. Use `npm run dev`, which starts both. |
-| `index_unavailable` | Meilisearch is not reachable. `npm run infra:up`, then check <http://localhost:7700/health>. |
+| Search returns 500, or the Library shows `ECONNREFUSED` | The API is not running. The web UI proxies `/v1/*` to port 8080. Use `npm run dev`, which starts both. |
+| `index_unavailable` | Meilisearch is unreachable. Run `npm run infra:up`, then check <http://localhost:7700/health>. |
 | Library says "Admin key required" | Set it under Settings → Admin access. In development it is `zwep_admin_dev_key`. |
-| A crawl indexes 0 documents | The source's `allowedDomains` may not include the seed's host, or `robots.txt` disallows `ZwepBot`. Run `zwep crawl <source> --json` to see `skipped` versus `failed`. |
-| `zwep: command not found` | Use `npx zwep` inside the repository, or `npm link` to install it globally. |
-| AI overview never appears | It is off by default. Turn it on in Settings and pick a provider. With `ollama`, make sure `ollama serve` is running. |
+| A crawl indexes 0 documents | The source's `allowedDomains` may not cover the seed's host, or `robots.txt` disallows `ZwepBot`. Run `zwep crawl <source> --json` to see `skipped` versus `failed`. |
+| `zwep: command not found` | `npm install -g zwep`, or use `npx zwep`. |
+| AI overview never appears | It is off by default. Enable it in Settings and pick a provider. For `ollama`, make sure `ollama serve` is running. |
 
-Still stuck? `zwep status --json` reports what Zwep thinks the state is —
-include it when you [open an issue](https://github.com/philppplik/zwep/issues/new/choose).
+Still stuck? `zwep status --json` prints what Zwep believes its state is —
+include it when you
+[open an issue](https://github.com/philppplik/zwep/issues/new/choose).
 
 </details>
 
 ---
 
-## How it works
+## Usage
 
-```
- sources.yaml ─┐
-               ├──▶ Crawler ──▶ Extractor ──▶ Indexer ──▶ Meilisearch
- Library UI  ──┘    robots.txt   Readability   quality       │
- CLI / API   ──┘    politeness   JSON-LD       scoring       │
-                         │                                   │
-                         └──▶ Knowledge graph (SQLite)       │
-                                                             ▼
-                                              Search API (Fastify, :8080)
-                                                             │
-                                          ┌──────────────────┼─────────────┐
-                                          ▼                  ▼             ▼
-                                      Web UI            zwep CLI      MCP agents
-```
+### Curating sources
 
-| Stage | What it does |
-| --- | --- |
-| **Crawler** | Fetches allow-listed URLs. Honours `robots.txt` and `crawl-delay`, serializes requests per host, caps time and response size, and renders JavaScript-heavy pages with Playwright only when the raw HTML is too thin. |
-| **Extractor** | Readability for the body, plus `og:`, JSON-LD and heading metadata. Normalizes language to ISO 639-1 and dates to ISO 8601. |
-| **Quality** | Scores every document 0–100 from content depth, freshness, title clarity and structure. The breakdown is visible in the UI. |
-| **Indexer** | Meilisearch behind an adapter interface, so the engine can be swapped. Typo tolerance, facets, and optional hybrid vector search. |
-| **Graph** | Extracts entities and co-mentions into SQLite. No extra container. |
-| **API** | Fastify. `/v1/search`, `/v1/suggest`, `/v1/document/:id`, `/v1/graph`, `/v1/overview`, plus admin routes. |
-
-Full detail in [`docs/architecture.md`](docs/architecture.md).
-
----
-
-## Curating sources
-
-A **source** is a set of seed URLs plus the domains the crawler may follow.
-Manage them in the Library UI, through the admin API, or from the CLI:
+A **source** is a set of seed URLs plus the domains the crawler may follow. Manage
+them in the Library UI, through the admin API, or from the terminal:
 
 ```bash
-zwep sources add my-blog --seed https://example.com/blog --max-pages 200
-zwep crawl my-blog
+zwep sources add my-docs --seed https://example.com/docs --max-pages 200
+zwep crawl my-docs
 zwep sources list
 ```
 
-Two kinds:
+Disabling a source keeps its configuration but drops it out of search results —
+the quickest way to see how a source affects your relevance.
 
-- **`web`** (default) — seeds plus `allowedDomains`. The crawler stays inside
-  the allow-list, follows a sitemap if given, and de-duplicates by canonical URL.
+Two kinds of source exist:
+
+- **`web`** (default) — seeds plus `allowedDomains`. The crawler stays inside the
+  allow-list, follows a sitemap if you give it one, and de-duplicates by
+  canonical URL.
 - **`google`** — a list of queries is run against Google and the result URLs are
-  crawled. Disabled by default; see below.
+  crawled. **Off by default** (`GOOGLE_PROXY_ENABLED`), because enabling it means
+  your queries leave your machine. It is also fragile: Google serves a
+  JavaScript-only shell to non-browser clients, so a plain fetch often returns
+  nothing. It degrades gracefully rather than crashing.
 
-Disabling a source keeps its configuration but removes it from search results,
-which is the quickest way to test how a source affects relevance.
+### Searching
 
-> **About the Google source.** It is **off by default** (`GOOGLE_PROXY_ENABLED`),
-> because enabling it means your configured queries leave your machine. It is
-> also fragile by design: Google serves a JavaScript-only shell to non-browser
-> clients and rate-limits datacenter IPs, so a plain fetch often returns zero
-> links. It degrades gracefully — reporting `indexed: 0` rather than crashing —
-> and works from an IP Google does not block. For reliable results, put a search
-> API or residential proxy behind it.
-
----
-
-## The command line
+From the browser at <http://localhost:5173>, or from the terminal:
 
 ```bash
-npx zwep help
+zwep search "climate policy"
+zwep search "climate policy" --source my-docs --type article --limit 5
+zwep overview "climate policy"     # AI summary of the top results
+zwep graph "climate"               # knowledge-graph neighbourhood
+zwep repl                          # interactive session
 ```
+
+Every command takes `--json`, and colour switches itself off when stdout is not a
+terminal — so piping into `jq` or a script always gives clean output:
+
+```bash
+zwep search "climate" --json | jq -r '.results[] | "\(.quality.score)\t\(.url)"'
+```
+
+### All commands
 
 ```
 SEARCH
@@ -218,31 +258,29 @@ AGENTS
   --json                Machine-readable output for any command
 ```
 
-The CLI talks to the HTTP API, so the same binary works against a local dev
-server, a container, or a Zwep on another machine:
+### Plain HTTP
+
+The REST API needs no client library:
 
 ```bash
-ZWEP_API=https://search.internal.example zwep search "quarterly report"
+curl "http://localhost:8080/v1/search?q=klimapolitik&limit=5&facets=true"
 ```
 
-Every command takes `--json`, and colour turns itself off when stdout is not a
-terminal — so piping into `jq` or a script always yields clean output:
-
-```bash
-zwep search "climate" --json | jq -r '.results[] | "\(.quality.score)\t\(.url)"'
-```
+The full contract is in [`docs/api.md`](docs/api.md).
 
 ---
 
 ## For AI agents
 
-Zwep is built to be an agent's private research corpus. Two ways in.
+An agent's weakness on the open web is credulity — it cannot tell a primary
+source from a content farm. A curated index removes that problem by
+construction: **every result already carries your judgement.**
 
 ### MCP server
 
-`zwep mcp` speaks the Model Context Protocol over stdio. Register it once and
-any MCP-capable client — Claude Code, Claude Desktop, Cursor — can search your
-index as a first-class tool:
+`zwep mcp` speaks the [Model Context Protocol](https://modelcontextprotocol.io)
+over stdio. Register it once and any MCP-capable client — Claude Code, Claude
+Desktop, Cursor — can search your index as a first-class tool:
 
 ```json
 {
@@ -264,10 +302,11 @@ index as a first-class tool:
 | `zwep_graph` | Entities related to a term |
 | `zwep_stats` | Index health |
 
-Read-only by default. The crawl tools (`zwep_crawl_url`, `zwep_crawl_source`)
-appear only when the server is started with `--allow-write` **and** an admin key
-is present — an agent that can index arbitrary URLs is a very different trust
-level from one that can only read what you curated:
+**Read-only by default.** The crawl tools (`zwep_crawl_url`,
+`zwep_crawl_source`) only appear when the server is started with
+`--allow-write` **and** an admin key is present — an agent that can index
+arbitrary URLs is a very different trust level from one that can only read what
+you curated:
 
 ```json
 {
@@ -280,29 +319,51 @@ level from one that can only read what you curated:
 }
 ```
 
-Tool failures are returned *inside* the result with `isError: true`, not as
-transport errors, so an agent can read the message and recover instead of
-losing its turn.
+Tool failures come back *inside* the result with `isError: true`, not as
+transport errors, so an agent can read the message and recover instead of losing
+its turn.
 
-### Plain HTTP
+---
 
-For anything that is not MCP, the REST API needs no client library:
+## How it works
 
-```bash
-curl "http://localhost:8080/v1/search?q=klimapolitik&limit=5&facets=true"
+```
+ sources.yaml ─┐
+               ├──▶ Crawler ──▶ Extractor ──▶ Indexer ──▶ Meilisearch
+ Library UI  ──┤    robots.txt   Readability   quality       │
+ CLI / API   ──┘    politeness   JSON-LD       scoring       │
+                         │                                   │
+                         └──▶ Knowledge graph (SQLite)       │
+                                                             ▼
+                                              Search API (Fastify, :8080)
+                                                             │
+                                          ┌──────────────────┼─────────────┐
+                                          ▼                  ▼             ▼
+                                      Web UI            zwep CLI      MCP agents
 ```
 
-The full contract is in [`docs/api.md`](docs/api.md).
+| Stage | What it does |
+| --- | --- |
+| **Crawler** | Fetches allow-listed URLs. Honours `robots.txt` and `crawl-delay`, serializes requests per host, caps time and response size, and renders JavaScript-heavy pages with Playwright only when the raw HTML is too thin. |
+| **Extractor** | Readability for the body, plus `og:`, JSON-LD and heading metadata. Normalizes language to ISO 639-1 and dates to ISO 8601. |
+| **Quality** | Scores every document 0–100 from content depth, freshness, title clarity and structure. The breakdown is visible in the UI. |
+| **Indexer** | Meilisearch behind an adapter interface, so the engine can be swapped. Typo tolerance, facets, optional hybrid vector search. |
+| **Graph** | Extracts entities and co-mentions into SQLite. No extra container. |
+| **API** | Fastify. `/v1/search`, `/v1/suggest`, `/v1/document/:id`, `/v1/graph`, `/v1/overview`, plus admin routes. |
+
+The whole web UI is about 18 kB gzipped, with no framework. Full detail in
+[`docs/architecture.md`](docs/architecture.md).
 
 ---
 
 ## Configuration
 
-Everything is environment variables; see [`.env.example`](.env.example) for the
-annotated list. The ones that matter most:
+Everything is environment variables; [`.env.example`](.env.example) documents all
+of them. The ones that matter most:
 
 | Variable | Default | Notes |
 | --- | --- | --- |
+| `ZWEP_API` | `http://127.0.0.1:8080` | Which Zwep the CLI and MCP server talk to. |
 | `ZWEP_ADMIN_KEY` | `zwep_admin_dev_key` | **Change this** before exposing the API. |
 | `MEILI_MASTER_KEY` | `zwep_dev_master_key_change_me` | **Change this** too. |
 | `API_HOST` | `127.0.0.1` | Loopback by default. Widen only behind a proxy. |
@@ -312,14 +373,12 @@ annotated list. The ones that matter most:
 | `EMBED_PROVIDER` | `none` | `ollama` or `openrouter` enables semantic search. |
 | `LLM_PROVIDER` | `none` | `ollama` (local) or `openrouter` (cloud) for AI Overview. |
 
-Read [SECURITY.md](SECURITY.md) before putting Zwep on a network. It documents
-what the security model does and does not cover.
+Read [SECURITY.md](SECURITY.md) before putting Zwep on a network — it states
+plainly what the security model does and does not cover.
 
----
+### Optional: semantic search and AI overview
 
-## Optional: semantic search and AI overview
-
-Both are off by default and both work fully locally with
+Both are off by default, and both work fully locally with
 [Ollama](https://ollama.com):
 
 ```bash
@@ -327,12 +386,11 @@ ollama pull nomic-embed-text   # embeddings
 ollama pull llama3.1           # overview generation
 ```
 
-Then set `EMBED_PROVIDER=ollama` and `LLM_PROVIDER=ollama`, or pick them in
-Settings — the UI pushes them to the server without a restart.
-
-With `openrouter`, queries and result excerpts are sent to a third party. With
-`ollama`, nothing leaves your machine. If a provider is unreachable, the feature
-disables itself for a minute and search continues unaffected.
+Set `EMBED_PROVIDER=ollama` and `LLM_PROVIDER=ollama`, or pick them in Settings —
+the UI pushes them to the server without a restart. With `openrouter`, queries
+and result excerpts go to a third party; with `ollama`, nothing leaves your
+machine. If a provider is unreachable, the feature disables itself for a minute
+and search continues unaffected.
 
 ---
 
@@ -340,18 +398,18 @@ disables itself for a minute and search continues unaffected.
 
 ```bash
 npm run dev            # API + web UI
-npm test               # 247 tests, no network needed
+npm test               # 259 tests, no network needed
 npm run test:watch     # re-run affected tests as you type
 npm run verify         # lint + typecheck + test (what CI runs)
 npm run build          # production web bundle
 ```
 
-The test suite runs in a few seconds with nothing installed beyond `npm ci` —
+The suite runs in a few seconds with nothing installed beyond `npm ci` —
 Meilisearch, Ollama and OpenRouter are all faked. CI runs it on Ubuntu, Windows
-and macOS across Node 22 and 24.
+and macOS across Node 22 and 24, plus CodeQL and a dependency audit.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the project layout, code style and
-review expectations.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for project layout, code style and review
+expectations.
 
 ---
 
@@ -373,11 +431,28 @@ review expectations.
 ## Status
 
 **Working, and in use.** The crawl → extract → index → search path is complete,
-covered by tests, and runs on all three desktop platforms. The knowledge graph,
-semantic search and AI overview are functional and optional.
+covered by 259 tests, and runs on all three desktop platforms. The knowledge
+graph, semantic search and AI overview are functional and optional.
 
 Not there yet: a built-in scheduler, incremental re-crawling, and multi-user
-access control. See [`docs/roadmap.md`](docs/roadmap.md).
+access control. The reasoning and priorities are in
+[`docs/roadmap.md`](docs/roadmap.md).
+
+Zwep is pre-1.0. The REST contract in [`docs/api.md`](docs/api.md) is stable in
+practice, but it may still change before 1.0; breaking changes are listed in
+[CHANGELOG.md](CHANGELOG.md).
+
+## Contributing
+
+Contributions are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) covers how to get
+set up, what the code is expected to look like, and how pull requests are
+reviewed. Bug reports and feature requests go through the
+[issue templates](https://github.com/philppplik/zwep/issues/new/choose);
+security reports go through a
+[private advisory](https://github.com/philppplik/zwep/security/advisories/new).
+
+Everyone taking part is expected to follow the
+[Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Related
 
@@ -387,4 +462,8 @@ project depends on the other's internals, only on the API contract.
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE) © Philipp Paulik
+
+Free to use, modify, distribute and sell, including commercially. The only
+condition is that the copyright notice and licence text travel with the code.
+The software comes with no warranty.

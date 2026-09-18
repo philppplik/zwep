@@ -1,9 +1,9 @@
 {
   "name": "zwep",
   "version": "0.2.0",
-  "private": true,
-  "description": "A small, self-hosted search engine — crawler + index + API + UI + agent-friendly CLI.",
+  "description": "Command line and MCP server for Zwep — a small, self-hosted search engine over the sources you curate.",
   "license": "MIT",
+  "author": "Philipp Paulik (https://github.com/philppplik)",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/philppplik/zwep.git"
@@ -12,6 +12,20 @@
     "url": "https://github.com/philppplik/zwep/issues"
   },
   "homepage": "https://github.com/philppplik/zwep#readme",
+  "keywords": [
+    "search",
+    "search-engine",
+    "self-hosted",
+    "crawler",
+    "meilisearch",
+    "mcp",
+    "mcp-server",
+    "model-context-protocol",
+    "ai-agents",
+    "rag",
+    "cli",
+    "privacy"
+  ],
   "type": "module",
   "workspaces": [
     "packages/*",
@@ -23,6 +37,17 @@
   },
   "bin": {
     "zwep": "./bin/zwep.mjs"
+  },
+  "//files": "The published package is the CLI and MCP server only. They are pure ESM with zero runtime dependencies, so `npx zwep` works anywhere Node does. The crawler and API are not shipped here: they need Meilisearch, Docker and Playwright, and are installed by cloning the repository.",
+  "files": [
+    "bin/",
+    "cli/",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "dev": "node scripts/dev-runner.mjs",
@@ -40,7 +65,8 @@
     "test:coverage": "vitest run --coverage",
     "verify": "npm run lint && npm run typecheck && npm run test",
     "infra:up": "docker compose up -d meilisearch redis",
-    "infra:down": "docker compose down"
+    "infra:down": "docker compose down",
+    "prepublishOnly": "npm run verify"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
