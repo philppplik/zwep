@@ -133,23 +133,18 @@ function checkEnvFile() {
   };
 }
 
-async function checkMeilisearch() {
-  const host = (process.env.MEILI_HOST ?? 'http://127.0.0.1:7700').replace(/\/+$/, '');
-  try {
-    const res = await fetch(`${host}/health`, { signal: AbortSignal.timeout(2500) });
-    if (res.ok) return { name: 'Meilisearch', status: 'ok', detail: `reachable at ${host}` };
-  } catch {
-    /* fall through to the diagnosis below */
-  }
-
-  const docker = commandVersion('docker');
-  const native = commandVersion('meilisearch');
-
-  // The fix depends on what is actually available, so the advice is built from
-  // what we found rather than assuming everyone has Docker.
+/**
+ * What to tell someone whose Meilisearch is not answering.
+ *
+ * Pure, and takes what it found rather than probing: the advice differs
+ * depending on what is installed, and a test that cannot control that ends up
+ * asserting whatever the CI runner happens to have. (It did — CI runners ship
+ * Docker, so the Docker-free branch was never exercised.)
+ */
+export function meilisearchAdvice({ host, hasDocker, hasNativeBinary, windows = false }) {
   const fix = [`Nothing is answering at ${host}. Pick whichever suits you:`, ''];
 
-  if (docker) {
+  if (hasDocker) {
     fix.push('  Docker is installed — start it with:', '    npm run infra:up', '');
   } else {
     fix.push(
@@ -158,13 +153,13 @@ async function checkMeilisearch() {
       '  a) Install Docker Desktop, then `npm run infra:up`',
       '     https://docs.docker.com/get-docker/',
       '',
-      native
+      hasNativeBinary
         ? '  b) You already have the meilisearch binary — start it with:'
         : '  b) Run Meilisearch directly, no Docker needed:',
     );
-    if (!native) {
+    if (!hasNativeBinary) {
       fix.push(
-        isWindows
+        windows
           ? '     Download meilisearch.exe from https://github.com/meilisearch/meilisearch/releases'
           : '     curl -L https://install.meilisearch.com | sh',
       );
@@ -173,18 +168,34 @@ async function checkMeilisearch() {
   }
 
   fix.push('  Zwep starts without it, but every search returns 503.');
+  return fix;
+}
+
+async function checkMeilisearch(probes) {
+  const host = (process.env.MEILI_HOST ?? 'http://127.0.0.1:7700').replace(/\/+$/, '');
+  try {
+    const res = await fetch(`${host}/health`, { signal: AbortSignal.timeout(2500) });
+    if (res.ok) return { name: 'Meilisearch', status: 'ok', detail: `reachable at ${host}` };
+  } catch {
+    /* fall through to the diagnosis below */
+  }
 
   return {
     name: 'Meilisearch',
     status: 'fail',
     blocking: true,
     detail: `not reachable at ${host}`,
-    fix,
+    fix: meilisearchAdvice({
+      host,
+      hasDocker: Boolean(probes.dockerVersion()),
+      hasNativeBinary: Boolean(probes.meilisearchVersion()),
+      windows: probes.windows,
+    }),
   };
 }
 
-function checkDocker() {
-  const version = commandVersion('docker');
+function checkDocker(probes) {
+  const version = probes.dockerVersion();
   if (!version) {
     return {
       name: 'Docker',
@@ -198,12 +209,7 @@ function checkDocker() {
   }
 
   // Installed but not running is its own, very common, state.
-  const running = spawnSync(isWindows ? 'docker.exe' : 'docker', ['info'], {
-    stdio: 'ignore',
-    timeout: 10_000,
-    windowsHide: true,
-  });
-  return running.status === 0
+  return probes.dockerRunning()
     ? { name: 'Docker', status: 'ok', detail: version }
     : {
         name: 'Docker',
@@ -235,7 +241,10 @@ async function checkApi(base) {
   };
 }
 
-function checkPlaywright() {
+function checkPlaywright(probes) {
+  if (!probes.probeSlowChecks) {
+    return { name: 'Playwright', status: 'skip', detail: 'not checked' };
+  }
   const home = findZwepHome();
   if (!home) return { name: 'Playwright', status: 'skip', detail: 'no engine installed' };
 
@@ -296,11 +305,34 @@ function checkPort(port) {
   });
 }
 
+/**
+ * Everything the doctor learns about the outside world, in one injectable
+ * object.
+ *
+ * Shelling out from inside each check made the results depend on whatever the
+ * host happened to have installed — CI runners ship Docker, so the "no Docker"
+ * advice was never actually exercised by the test that claimed to cover it.
+ */
+export const realProbes = {
+  windows: isWindows,
+  /** Playwright's check spawns a process and is slow; tests opt out. */
+  probeSlowChecks: true,
+  dockerVersion: () => commandVersion('docker'),
+  meilisearchVersion: () => commandVersion('meilisearch'),
+  dockerRunning: () =>
+    spawnSync(isWindows ? 'docker.exe' : 'docker', ['info'], {
+      stdio: 'ignore',
+      timeout: 10_000,
+      windowsHide: true,
+    }).status === 0,
+};
+
 /** Run every check. Returns the raw results so the caller can render them. */
-export async function runDoctor({ base = 'http://127.0.0.1:8080' } = {}) {
+export async function runDoctor({ base = 'http://127.0.0.1:8080', probes = realProbes } = {}) {
+  const p = { ...realProbes, ...probes };
   const apiPort = Number(new URL(base).port || 8080);
   const [meili, api, port] = await Promise.all([
-    checkMeilisearch(),
+    checkMeilisearch(p),
     checkApi(base),
     checkPort(apiPort),
   ]);
@@ -309,11 +341,11 @@ export async function runDoctor({ base = 'http://127.0.0.1:8080' } = {}) {
     checkNode(),
     checkInstallation(),
     checkEnvFile(),
-    checkDocker(),
+    checkDocker(p),
     meili,
     api,
     port,
-    checkPlaywright(),
+    checkPlaywright(p),
   ];
 }
 
