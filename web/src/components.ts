@@ -39,6 +39,7 @@ export class SearchBar {
   private onSearch: (q: string) => void;
   private disposables = new Disposables();
   private inflight?: AbortController;
+  private destroyed = false;
   private runSuggest = debounce(() => void this.fetchSuggestions(), 180);
 
   constructor(onSearch: (q: string) => void) {
@@ -118,13 +119,25 @@ export class SearchBar {
     return this.input.value;
   }
 
+  /**
+   * Tear the bar down: cancel the pending debounce, abort any in-flight
+   * request and drop every listener.
+   *
+   * The `destroyed` flag matters because the element can outlive the call —
+   * the shell reuses one search bar across views, so a keystroke arriving
+   * after teardown would otherwise schedule a fresh request against a
+   * component nobody is listening to any more.
+   */
   destroy(): void {
+    this.destroyed = true;
     this.runSuggest.cancel();
     this.inflight?.abort();
+    this.inflight = undefined;
     this.disposables.dispose();
   }
 
   private async fetchSuggestions(): Promise<void> {
+    if (this.destroyed) return;
     const q = this.input.value.trim();
     if (q.length < 2) return this.hideSuggest();
     // Cancel the previous request: with fast typing, late responses used to

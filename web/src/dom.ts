@@ -122,8 +122,24 @@ export function trapFocus(container: HTMLElement, onEscape?: () => void): () => 
   const selector =
     'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
 
+  /**
+   * Visible, reachable controls inside the dialog.
+   *
+   * Visibility is decided from the `hidden` attribute and the computed
+   * `display`/`visibility`, not from `offsetParent`: `offsetParent` depends on
+   * a layout engine, so it reports "invisible" for every element in a
+   * non-rendering environment (jsdom, a headless snapshot) and the trap would
+   * silently find nothing to focus.
+   */
+  const isVisible = (n: HTMLElement): boolean => {
+    if (n.hasAttribute('hidden') || n.closest('[hidden]')) return false;
+    if (n.getAttribute('aria-hidden') === 'true') return false;
+    const style = n.ownerDocument.defaultView?.getComputedStyle(n);
+    return !style || (style.display !== 'none' && style.visibility !== 'hidden');
+  };
+
   const focusable = () =>
-    [...container.querySelectorAll<HTMLElement>(selector)].filter((n) => n.offsetParent !== null);
+    [...container.querySelectorAll<HTMLElement>(selector)].filter(isVisible);
 
   focusable()[0]?.focus();
 

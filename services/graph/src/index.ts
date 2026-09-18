@@ -150,12 +150,22 @@ export class KnowledgeGraph {
     `);
   }
 
-  /** Extract candidate entities from a document's text. Heuristic, fast, no deps. */
+  /**
+   * Extract candidate entities from a document's text. Heuristic, fast, no deps.
+   *
+   * Matches runs of capitalised words, optionally followed by a legal-form
+   * suffix. The suffix clause matters: `GmbH`, `AG` and `LLC` are not
+   * `[A-Z][a-z]+`, so without it "Acme GmbH" was only ever captured as "Acme"
+   * and `guessType`'s organisation branch could never fire on real text.
+   */
   static extractEntities(text: string, title = ''): Entity[] {
     const blob = `${title}. ${text}`;
     const found = new Map<string, string>();
-    // proper nouns: sequences of Capitalized words (2-4 tokens), len >= 3
-    const re = /\b([A-Z][a-zäöüß]{2,}(?:\s+[A-Z][a-zäöüß]{2,}){0,3})\b/g;
+    const word = '[A-Z][a-zäöüßéèêáàâ]{2,}';
+    const re = new RegExp(
+      `\\b(${word}(?:\\s+${word}){0,3}(?:\\s+(?:${LEGAL_FORMS.join('|')}))?)\\b`,
+      'g',
+    );
     let m: RegExpExecArray | null;
     while ((m = re.exec(blob)) !== null) {
       const label = m[1].trim();
@@ -262,10 +272,41 @@ function slug(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9äöüß]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 64);
 }
 
+/**
+ * Legal-form suffixes that mark an entity as an organisation.
+ *
+ * Also spliced into the entity regex above, so "Acme GmbH" is captured as one
+ * entity instead of the bare "Acme" — which is why this branch used to be
+ * unreachable on real text.
+ */
+const LEGAL_FORMS = [
+  'GmbH',
+  'mbH',
+  'AG',
+  'SE',
+  'KG',
+  'Inc',
+  'LLC',
+  'Ltd',
+  'Corp',
+  'PLC',
+  'BV',
+  'NV',
+  'SA',
+  'SAS',
+  'SRL',
+  'Oy',
+  'AB',
+];
+
+const ORG_RE = new RegExp(`\\b(?:${LEGAL_FORMS.join('|')})\\b`, 'i');
+const INSTITUTION_RE =
+  /\b(University|Universit[äa]t|Hochschule|Institute?|Institut|Foundation|Stiftung|Laboratory|Lab)\b/i;
+
 function guessType(label: string): string {
   if (/^[A-Z]\w+\s+\d{4}$/.test(label)) return 'event';
-  if (/\b(GmbH|Inc|LLC|AG|Corp|Ltd)\b/i.test(label)) return 'org';
-  if (/\b(University|Institute|Lab)\b/i.test(label)) return 'org';
+  if (ORG_RE.test(label)) return 'org';
+  if (INSTITUTION_RE.test(label)) return 'org';
   return 'concept';
 }
 

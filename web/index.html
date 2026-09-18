@@ -5,29 +5,52 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Zwep — self-hosted search</title>
 
-    <!-- Favicon / app icons -->
-    <link rel="icon" type="image/png" href="/zwep-logo.png" />
-    <link rel="apple-touch-icon" href="/zwep-logo.png" />
-    <meta name="theme-color" content="#ff6600" />
-
-    <!-- Brand font: LINE Seed JP -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=LINE+Seed+JP:wght@400;700;800&display=swap"
-      rel="stylesheet"
-    />
-    <!-- Inter as fallback for latin text -->
-    <link rel="preconnect" href="https://rsms.me/" />
-    <link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
-
     <meta
       name="description"
       content="Zwep — a small, self-hosted search engine. Crawl what you curate, search it instantly."
     />
+    <meta name="theme-color" content="#ff6600" />
+    <meta name="color-scheme" content="light dark" />
+    <!-- The index is private; keep it out of public crawlers. -->
+    <meta name="robots" content="noindex, nofollow" />
+
+    <link rel="icon" type="image/png" href="/zwep-logo.png" />
+    <link rel="apple-touch-icon" href="/zwep-logo.png" />
+
+    <!--
+      No web-font CDN on purpose.
+
+      Zwep's promise is that your queries never leave your infrastructure. A
+      stylesheet from fonts.googleapis.com would hand every page view — and the
+      referring URL, which contains the search query — to a third party. The UI
+      uses the system font stack plus whatever brand font is installed locally.
+    -->
+
+    <script>
+      // Apply the stored theme before first paint to avoid a flash of the
+      // wrong colour scheme. Kept inline and tiny for that reason.
+      (function () {
+        try {
+          var saved = JSON.parse(localStorage.getItem('zwep.settings') || '{}');
+          var theme = saved.theme || 'system';
+          if (theme === 'system') {
+            theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          }
+          document.documentElement.setAttribute('data-theme', theme);
+        } catch (e) {
+          /* defaults are fine */
+        }
+      })();
+    </script>
   </head>
   <body>
+    <a class="z-sr-only" href="#z-main">Skip to content</a>
     <div id="app"></div>
+    <noscript>
+      <p style="padding: 2rem; text-align: center">
+        Zwep's interface needs JavaScript. The REST API at <code>/v1/search</code> works without it.
+      </p>
+    </noscript>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

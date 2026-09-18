@@ -11,6 +11,7 @@
  */
 import process from 'node:process';
 import { createInterface } from 'node:readline';
+import { parseArgs } from '../cli/args.mjs';
 import { ZwepClient, ZwepApiError, waitForTask } from '../cli/api.mjs';
 import { runMcpStdio } from '../cli/mcp.mjs';
 import { banner, box, c, meter, rule, spinner, symbols, table, termWidth, truncate } from '../cli/ui.mjs';
@@ -20,34 +21,6 @@ const VERSION = '0.2.0';
 // ---------------------------------------------------------------------------
 // Argument parsing
 // ---------------------------------------------------------------------------
-
-/** Minimal flag parser: `--key value`, `--key=value`, `--flag`, `-abc`. */
-export function parseArgs(argv) {
-  const flags = {};
-  const positional = [];
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
-    if (a === '--') {
-      positional.push(...argv.slice(i + 1));
-      break;
-    }
-    if (a.startsWith('--')) {
-      const [key, inline] = a.slice(2).split(/=(.*)/s);
-      if (inline !== undefined) {
-        flags[key] = inline;
-      } else if (argv[i + 1] !== undefined && !argv[i + 1].startsWith('-')) {
-        flags[key] = argv[++i];
-      } else {
-        flags[key] = true;
-      }
-    } else if (a.startsWith('-') && a.length > 1) {
-      for (const ch of a.slice(1)) flags[ch] = true;
-    } else {
-      positional.push(a);
-    }
-  }
-  return { flags, positional };
-}
 
 const { flags, positional } = parseArgs(process.argv.slice(2));
 const command = positional[0];
