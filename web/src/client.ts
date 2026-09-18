@@ -83,7 +83,11 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
 
   if (!res.ok) {
     const err = (payload as { error?: { message?: string; code?: string } } | null)?.error;
-    throw new ApiError(err?.message ?? `Request failed (${res.status})`, res.status, err?.code ?? String(res.status));
+    throw new ApiError(
+      err?.message ?? `Request failed (${res.status})`,
+      res.status,
+      err?.code ?? String(res.status),
+    );
   }
   return payload as T;
 }

@@ -198,7 +198,12 @@ export function createMcpServer({ client, allowWrite = false, write, log = () =>
         const g = await client.graph(args.query);
         return content({
           query: g.query,
-          nodes: (g.nodes ?? []).map((n) => ({ id: n.id, label: n.label, type: n.type, docs: n.doc_count })),
+          nodes: (g.nodes ?? []).map((n) => ({
+            id: n.id,
+            label: n.label,
+            type: n.type,
+            docs: n.doc_count,
+          })),
           edges: (g.edges ?? []).map((e) => ({ from: e.src, to: e.dst, weight: e.weight })),
         });
       }

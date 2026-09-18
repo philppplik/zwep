@@ -70,12 +70,16 @@ describe('sourceSchema', () => {
   });
 
   it('rejects a name that would break the document id', () => {
-    expect(() => sourceSchema.parse({ name: 'has spaces', seeds: [], allowedDomains: [] })).toThrow();
+    expect(() =>
+      sourceSchema.parse({ name: 'has spaces', seeds: [], allowedDomains: [] }),
+    ).toThrow();
     expect(() => sourceSchema.parse({ name: '', seeds: [], allowedDomains: [] })).toThrow();
   });
 
   it('rejects a malformed seed URL', () => {
-    expect(() => sourceSchema.parse({ name: 'x', seeds: ['not-a-url'], allowedDomains: [] })).toThrow();
+    expect(() =>
+      sourceSchema.parse({ name: 'x', seeds: ['not-a-url'], allowedDomains: [] }),
+    ).toThrow();
   });
 });
 

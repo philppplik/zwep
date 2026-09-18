@@ -36,7 +36,10 @@ describe('extractEntities', () => {
   it('caps how many entities one document contributes', () => {
     // Regression guard: a glossary page produced thousands of entities and a
     // quadratic number of co-mention edges, ballooning the database.
-    const text = Array.from({ length: 400 }, (_, i) => `Entityname${String.fromCharCode(97 + (i % 26))}${i}x`)
+    const text = Array.from(
+      { length: 400 },
+      (_, i) => `Entityname${String.fromCharCode(97 + (i % 26))}${i}x`,
+    )
       .map((w) => `${w.charAt(0).toUpperCase()}${w.slice(1)}`)
       .join(' und ');
     expect(KnowledgeGraph.extractEntities(text).length).toBeLessThanOrEqual(MAX_ENTITIES_PER_DOC);

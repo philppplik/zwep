@@ -95,7 +95,7 @@
 }
 
 .z-topbar__title:not(:empty)::before {
-  content: "/ ";
+  content: '/ ';
   color: var(--z-text-tertiary);
 }
 
@@ -228,7 +228,9 @@
 
 .z-search:focus-within {
   border-color: var(--z-accent);
-  box-shadow: var(--z-shadow-md), 0 0 0 3px var(--z-accent-soft);
+  box-shadow:
+    var(--z-shadow-md),
+    0 0 0 3px var(--z-accent-soft);
 }
 
 .z-search__input {
@@ -460,7 +462,7 @@
 }
 
 .z-result__date::before {
-  content: "· ";
+  content: '· ';
 }
 
 .z-result__title {
@@ -720,7 +722,7 @@
 }
 
 .z-empty__hints li::before {
-  content: "•";
+  content: '•';
   position: absolute;
   left: 0;
   color: var(--z-accent);
@@ -1351,11 +1353,11 @@
   gap: var(--z-space-3);
 }
 
-input[type="text"],
-input[type="search"],
-input[type="url"],
-input[type="number"],
-input[type="password"],
+input[type='text'],
+input[type='search'],
+input[type='url'],
+input[type='number'],
+input[type='password'],
 textarea,
 select {
   width: 100%;
@@ -1433,7 +1435,7 @@ textarea {
 }
 
 .z-switch span::before {
-  content: "";
+  content: '';
   position: absolute;
   top: 3px;
   left: 3px;

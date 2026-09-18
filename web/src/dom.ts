@@ -138,8 +138,7 @@ export function trapFocus(container: HTMLElement, onEscape?: () => void): () => 
     return !style || (style.display !== 'none' && style.visibility !== 'hidden');
   };
 
-  const focusable = () =>
-    [...container.querySelectorAll<HTMLElement>(selector)].filter(isVisible);
+  const focusable = () => [...container.querySelectorAll<HTMLElement>(selector)].filter(isVisible);
 
   focusable()[0]?.focus();
 

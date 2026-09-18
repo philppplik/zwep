@@ -56,7 +56,14 @@ describe('buildFilter', () => {
 
   it('builds type, tag, lang and date clauses', () => {
     expect(
-      buildFilter({ q: 'x', source: ['a'], type: ['article'], tag: ['t1', 't2'], lang: 'de', from: '2025-01-01' }),
+      buildFilter({
+        q: 'x',
+        source: ['a'],
+        type: ['article'],
+        tag: ['t1', 't2'],
+        lang: 'de',
+        from: '2025-01-01',
+      }),
     ).toEqual([
       'source IN ["a"]',
       'type IN ["article"]',
@@ -117,7 +124,10 @@ describe('Indexer.search', () => {
             id: '1',
             title: 'Climate policy',
             excerpt: 'About climate.',
-            _formatted: { title: '<mark>Climate</mark> policy', excerpt: 'About <mark>climate</mark>.' },
+            _formatted: {
+              title: '<mark>Climate</mark> policy',
+              excerpt: 'About <mark>climate</mark>.',
+            },
             _rankingScore: 0.87,
           },
         ],

@@ -179,7 +179,8 @@ function renderSearchShell(): void {
   tabs.className = 'z-tabs';
   tabs.setAttribute('role', 'tablist');
   tabs.innerHTML = TABS.map((t) => {
-    const active = t.id === 'graph' ? state.view === 'graph' : state.view === 'results' && state.type === t.id;
+    const active =
+      t.id === 'graph' ? state.view === 'graph' : state.view === 'results' && state.type === t.id;
     return `<button class="z-tab${active ? ' is-active' : ''}" type="button" role="tab"
               aria-selected="${active}" data-type="${t.id}">${t.label}</button>`;
   }).join('');
@@ -324,9 +325,7 @@ async function route(): Promise<void> {
   state.offset = Number(params.get('offset')) || 0;
   state.view = params.get('view') === 'graph' ? 'graph' : 'results';
   state.facets = new Map(
-    [...params.entries()]
-      .filter(([k]) => k.startsWith('f_'))
-      .map(([k, v]) => [k.slice(2), v]),
+    [...params.entries()].filter(([k]) => k.startsWith('f_')).map(([k, v]) => [k.slice(2), v]),
   );
 
   if (!state.q) {

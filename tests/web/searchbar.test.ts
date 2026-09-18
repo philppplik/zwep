@@ -99,7 +99,9 @@ describe('suggestions', () => {
 
     input().dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
     expect(input().getAttribute('aria-activedescendant')).toBe('z-suggest-0');
-    expect(bar.el.querySelectorAll('[role="option"]')[0].getAttribute('aria-selected')).toBe('true');
+    expect(bar.el.querySelectorAll('[role="option"]')[0].getAttribute('aria-selected')).toBe(
+      'true',
+    );
 
     input().dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
     expect(input().getAttribute('aria-activedescendant')).toBe('z-suggest-1');
@@ -117,7 +119,9 @@ describe('suggestions', () => {
   });
 
   it('closes the list on Escape and clears the ARIA state', async () => {
-    vi.spyOn(client, 'suggest').mockResolvedValue([{ text: 'one', url: 'https://a', type: 'page' }]);
+    vi.spyOn(client, 'suggest').mockResolvedValue([
+      { text: 'one', url: 'https://a', type: 'page' },
+    ]);
     type('on');
     await flushSuggest();
     input().dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
@@ -126,7 +130,9 @@ describe('suggestions', () => {
   });
 
   it('closes the list when the user clicks elsewhere', async () => {
-    vi.spyOn(client, 'suggest').mockResolvedValue([{ text: 'one', url: 'https://a', type: 'page' }]);
+    vi.spyOn(client, 'suggest').mockResolvedValue([
+      { text: 'one', url: 'https://a', type: 'page' },
+    ]);
     type('on');
     await flushSuggest();
     document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));

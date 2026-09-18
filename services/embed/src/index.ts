@@ -58,7 +58,9 @@ class OllamaEmbed implements EmbedProvider {
         signal: AbortSignal.timeout(EMBED_TIMEOUT_MS),
       });
       if (!res.ok) {
-        throw new EmbedError(`Ollama embed failed: ${res.status} ${await res.text().catch(() => '')}`);
+        throw new EmbedError(
+          `Ollama embed failed: ${res.status} ${await res.text().catch(() => '')}`,
+        );
       }
       const data = (await res.json()) as { embedding: number[] };
       out.push(data.embedding);
@@ -98,7 +100,9 @@ class OpenRouterEmbed implements EmbedProvider {
       signal: AbortSignal.timeout(EMBED_TIMEOUT_MS),
     });
     if (!res.ok) {
-      throw new EmbedError(`OpenRouter embed failed: ${res.status} ${await res.text().catch(() => '')}`);
+      throw new EmbedError(
+        `OpenRouter embed failed: ${res.status} ${await res.text().catch(() => '')}`,
+      );
     }
     const data = (await res.json()) as { data: { embedding: number[] }[] };
     return data.data.map((d) => d.embedding);

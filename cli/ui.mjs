@@ -15,10 +15,8 @@ const noColor =
 
 export const colorEnabled = Boolean(forceColor) || (!noColor && process.stdout.isTTY === true);
 
-const code =
-  (open, close) =>
-  (s) =>
-    colorEnabled ? `${ESC}${open}m${s}${ESC}${close}m` : String(s);
+const code = (open, close) => (s) =>
+  colorEnabled ? `${ESC}${open}m${s}${ESC}${close}m` : String(s);
 
 export const c = {
   reset: (s) => String(s),
@@ -73,7 +71,8 @@ const ASCII_BOX = { tl: '+', tr: '+', bl: '+', br: '+', h: '-', v: '|', ml: '+',
 
 /** Unicode box drawing, unless the terminal is likely to mangle it. */
 function glyphs() {
-  const legacyWindows = process.platform === 'win32' && !process.env.WT_SESSION && !process.env.TERM;
+  const legacyWindows =
+    process.platform === 'win32' && !process.env.WT_SESSION && !process.env.TERM;
   return legacyWindows ? ASCII_BOX : BOX;
 }
 
@@ -103,14 +102,17 @@ export function rule() {
  */
 export function table(rows, columns) {
   if (!rows.length) return c.dim('(nothing to show)');
-  const cell = (col, row) => String(col.format ? col.format(row[col.key], row) : (row[col.key] ?? ''));
+  const cell = (col, row) =>
+    String(col.format ? col.format(row[col.key], row) : (row[col.key] ?? ''));
   const widths = columns.map(
     (col) => col.width ?? Math.max(width(col.label), ...rows.map((r) => width(cell(col, r)))),
   );
   const header = columns.map((col, i) => c.bold(pad(col.label, widths[i], col.align))).join('  ');
   const sep = c.dim(widths.map((w) => glyphs().h.repeat(w)).join('  '));
   const body = rows.map((r) =>
-    columns.map((col, i) => pad(truncate(cell(col, r), widths[i]), widths[i], col.align)).join('  '),
+    columns
+      .map((col, i) => pad(truncate(cell(col, r), widths[i]), widths[i], col.align))
+      .join('  '),
   );
   return [header, sep, ...body].join('\n');
 }
@@ -130,9 +132,12 @@ const SPINNER = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', 
 export function spinner(text) {
   if (!process.stderr.isTTY) {
     process.stderr.write(`${text}\n`);
-    return { update() {}, stop(final) {
-      if (final) process.stderr.write(`${final}\n`);
-    } };
+    return {
+      update() {},
+      stop(final) {
+        if (final) process.stderr.write(`${final}\n`);
+      },
+    };
   }
   let i = 0;
   let label = text;

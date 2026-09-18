@@ -21,7 +21,11 @@ export class ZwepApiError extends Error {
 }
 
 export class ZwepClient {
-  constructor({ base = DEFAULT_BASE, adminKey = process.env.ZWEP_ADMIN_KEY, timeoutMs = 30_000 } = {}) {
+  constructor({
+    base = DEFAULT_BASE,
+    adminKey = process.env.ZWEP_ADMIN_KEY,
+    timeoutMs = 30_000,
+  } = {}) {
     this.base = String(base).replace(/\/+$/, '');
     this.adminKey = adminKey;
     this.timeoutMs = timeoutMs;
@@ -33,10 +37,10 @@ export class ZwepClient {
     if (body !== undefined) headers['content-type'] = 'application/json';
     if (admin) {
       if (!this.adminKey) {
-        throw new ZwepApiError(
-          'No admin key. Set ZWEP_ADMIN_KEY or pass --admin-key.',
-          { code: 'no_admin_key', url },
-        );
+        throw new ZwepApiError('No admin key. Set ZWEP_ADMIN_KEY or pass --admin-key.', {
+          code: 'no_admin_key',
+          url,
+        });
       }
       // Sent as a header, never as a query parameter: query strings end up in
       // proxy logs and shell history.

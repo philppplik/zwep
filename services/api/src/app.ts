@@ -58,9 +58,12 @@ export async function build(opts: BuildOptions = {}): Promise<FastifyInstance> {
   });
 
   await app.register(cors, {
-    origin: env.API_CORS_ORIGINS.trim() === '*'
-      ? true
-      : env.API_CORS_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean),
+    origin:
+      env.API_CORS_ORIGINS.trim() === '*'
+        ? true
+        : env.API_CORS_ORIGINS.split(',')
+            .map((s) => s.trim())
+            .filter(Boolean),
   });
 
   // Index setup is best-effort: the API must still boot (and report a clear
@@ -211,9 +214,15 @@ export async function build(opts: BuildOptions = {}): Promise<FastifyInstance> {
       const host = loadEnv().OLLAMA_HOST.replace(/\/$/, '');
       const res = await fetch(`${host}/api/tags`, { signal: AbortSignal.timeout(5000) });
       if (!res.ok) throw new Error(`status ${res.status}`);
-      const data = (await res.json()) as { models?: { name?: string; model?: string; size?: number }[] };
+      const data = (await res.json()) as {
+        models?: { name?: string; model?: string; size?: number }[];
+      };
       const models = (data.models ?? [])
-        .map((m) => ({ id: m.name || m.model || '', name: m.name || m.model || '', size: m.size ?? 0 }))
+        .map((m) => ({
+          id: m.name || m.model || '',
+          name: m.name || m.model || '',
+          size: m.size ?? 0,
+        }))
         .filter((m) => m.id);
       return { ok: true, models };
     } catch (e) {
@@ -346,7 +355,12 @@ export async function build(opts: BuildOptions = {}): Promise<FastifyInstance> {
       return fail(reply, 400, 'invalid', `Unknown source: ${body.source ?? '(none)'}`);
     }
     if (tasks.runningCount() >= MAX_CONCURRENT_CRAWLS) {
-      return fail(reply, 429, 'too_many_crawls', 'Too many crawls already running. Try again shortly.');
+      return fail(
+        reply,
+        429,
+        'too_many_crawls',
+        'Too many crawls already running. Try again shortly.',
+      );
     }
     const task = startCrawl(body.source, numParam(body.maxPages));
     return reply.code(202).send({ ok: true, taskId: task.id });

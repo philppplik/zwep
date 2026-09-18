@@ -78,7 +78,11 @@ describe('tools/list', () => {
 
   it('gives every tool a JSON Schema an agent can validate against', async () => {
     await h.server.line(rpc('tools/list'));
-    for (const tool of h.sent[0].result!.tools as { name: string; description: string; inputSchema: { type: string } }[]) {
+    for (const tool of h.sent[0].result!.tools as {
+      name: string;
+      description: string;
+      inputSchema: { type: string };
+    }[]) {
       expect(tool.description.length).toBeGreaterThan(20);
       expect(tool.inputSchema.type).toBe('object');
     }
@@ -87,15 +91,22 @@ describe('tools/list', () => {
 
 describe('tools/call', () => {
   it('returns a text content block', async () => {
-    await h.server.line(rpc('tools/call', { name: 'zwep_search', arguments: { query: 'climate' } }));
-    const result = h.sent[0].result as { content: { type: string; text: string }[]; isError: boolean };
+    await h.server.line(
+      rpc('tools/call', { name: 'zwep_search', arguments: { query: 'climate' } }),
+    );
+    const result = h.sent[0].result as {
+      content: { type: string; text: string }[];
+      isError: boolean;
+    };
     expect(result.isError).toBe(false);
     expect(result.content[0].type).toBe('text');
     expect(() => JSON.parse(result.content[0].text)).not.toThrow();
   });
 
   it('clamps the search limit into the advertised range', async () => {
-    await h.server.line(rpc('tools/call', { name: 'zwep_search', arguments: { query: 'x', limit: 9999 } }));
+    await h.server.line(
+      rpc('tools/call', { name: 'zwep_search', arguments: { query: 'x', limit: 9999 } }),
+    );
     expect(h.client.search).toHaveBeenCalledWith(expect.objectContaining({ limit: 50 }));
   });
 
@@ -106,7 +117,17 @@ describe('tools/call', () => {
         total: 1,
         took_ms: 1,
         results: [
-          { id: 'a', title: 'T', url: 'https://e.com', source: 's', type: 'article', lang: 'en', excerpt: 'e', content: 'huge', quality: { score: 0.8 } },
+          {
+            id: 'a',
+            title: 'T',
+            url: 'https://e.com',
+            source: 's',
+            type: 'article',
+            lang: 'en',
+            excerpt: 'e',
+            content: 'huge',
+            quality: { score: 0.8 },
+          },
         ],
       })),
     });
@@ -123,8 +144,12 @@ describe('tools/call', () => {
     const big = harness({
       document: vi.fn(async () => ({ id: 'a', title: 'T', content: 'x'.repeat(50_000) })),
     });
-    await big.server.line(rpc('tools/call', { name: 'zwep_fetch_document', arguments: { id: 'a' } }));
-    const payload = JSON.parse((big.sent[0].result as { content: { text: string }[] }).content[0].text);
+    await big.server.line(
+      rpc('tools/call', { name: 'zwep_fetch_document', arguments: { id: 'a' } }),
+    );
+    const payload = JSON.parse(
+      (big.sent[0].result as { content: { text: string }[] }).content[0].text,
+    );
     expect(payload.content.length).toBe(20_000);
   });
 
@@ -134,7 +159,9 @@ describe('tools/call', () => {
         throw new ZwepApiError('index down', { status: 503, code: 'index_unavailable' });
       }),
     });
-    await failing.server.line(rpc('tools/call', { name: 'zwep_search', arguments: { query: 'x' } }));
+    await failing.server.line(
+      rpc('tools/call', { name: 'zwep_search', arguments: { query: 'x' } }),
+    );
     const result = failing.sent[0].result as { content: { text: string }[]; isError: boolean };
     // A transport-level error would abort the agent's turn; this is recoverable.
     expect(failing.sent[0].error).toBeUndefined();
@@ -143,7 +170,9 @@ describe('tools/call', () => {
   });
 
   it('refuses a write tool when write access is off', async () => {
-    await h.server.line(rpc('tools/call', { name: 'zwep_crawl_url', arguments: { url: 'https://e.com' } }));
+    await h.server.line(
+      rpc('tools/call', { name: 'zwep_crawl_url', arguments: { url: 'https://e.com' } }),
+    );
     const result = h.sent[0].result as { content: { text: string }[]; isError: boolean };
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('--allow-write');
@@ -152,9 +181,13 @@ describe('tools/call', () => {
 
   it('runs a write tool when write access is on', async () => {
     const w = harness({}, true);
-    await w.server.line(rpc('tools/call', { name: 'zwep_crawl_url', arguments: { url: 'https://e.com' } }));
+    await w.server.line(
+      rpc('tools/call', { name: 'zwep_crawl_url', arguments: { url: 'https://e.com' } }),
+    );
     expect(w.client.crawlUrl).toHaveBeenCalledWith('https://e.com');
-    const payload = JSON.parse((w.sent[0].result as { content: { text: string }[] }).content[0].text);
+    const payload = JSON.parse(
+      (w.sent[0].result as { content: { text: string }[] }).content[0].text,
+    );
     expect(payload).toMatchObject({ status: 'done', source: 's1' });
   });
 

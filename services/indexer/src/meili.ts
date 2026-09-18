@@ -92,7 +92,8 @@ export class MeiliAdapter implements IndexAdapter {
       try {
         const vectors = await provider.embed(texts);
         docs.forEach((d, i) => {
-          if (vectors[i]) (d as Document & { _vectors?: unknown })._vectors = { [EMBEDDER]: vectors[i] };
+          if (vectors[i])
+            (d as Document & { _vectors?: unknown })._vectors = { [EMBEDDER]: vectors[i] };
         });
       } catch {
         resetEmbedProvider();

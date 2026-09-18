@@ -35,7 +35,10 @@ export function canonicalizeUrl(raw: string): string {
     u.hash = '';
     u.hostname = u.hostname.toLowerCase().replace(/^www\./, '');
     // Drop the default port so http://x:80/ === http://x/
-    if ((u.protocol === 'http:' && u.port === '80') || (u.protocol === 'https:' && u.port === '443')) {
+    if (
+      (u.protocol === 'http:' && u.port === '80') ||
+      (u.protocol === 'https:' && u.port === '443')
+    ) {
       u.port = '';
     }
     const params = [...u.searchParams.entries()]

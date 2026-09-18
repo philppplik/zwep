@@ -52,12 +52,15 @@ describe('safeUrl', () => {
     expect(safeUrl('https://example.com/a')).toBe('https://example.com/a');
   });
 
-  it.each(['javascript:alert(1)', 'data:text/html,<script>', 'file:///etc/passwd', 'nonsense', null])(
-    'rejects %s',
-    (url) => {
-      expect(safeUrl(url)).toBe('#');
-    },
-  );
+  it.each([
+    'javascript:alert(1)',
+    'data:text/html,<script>',
+    'file:///etc/passwd',
+    'nonsense',
+    null,
+  ])('rejects %s', (url) => {
+    expect(safeUrl(url)).toBe('#');
+  });
 });
 
 describe('safeHost', () => {

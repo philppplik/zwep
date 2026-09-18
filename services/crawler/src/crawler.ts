@@ -83,7 +83,14 @@ export class Crawler {
     this.timeoutMs = opts.timeoutMs ?? env.CRAWLER_TIMEOUT_MS;
     this.maxBytes = opts.maxBytes ?? env.CRAWLER_MAX_BYTES;
     this.allowedHosts = new Set(
-      source.allowedDomains.map((d) => d.trim().toLowerCase().replace(/^www\./, '')).filter(Boolean),
+      source.allowedDomains
+        .map((d) =>
+          d
+            .trim()
+            .toLowerCase()
+            .replace(/^www\./, ''),
+        )
+        .filter(Boolean),
     );
     // A `web` source with no allow-list would otherwise crawl the open internet.
     // Fall back to the hosts of its own seeds.

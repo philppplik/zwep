@@ -14,7 +14,18 @@ import { createInterface } from 'node:readline';
 import { parseArgs } from '../cli/args.mjs';
 import { ZwepClient, ZwepApiError, waitForTask } from '../cli/api.mjs';
 import { runMcpStdio } from '../cli/mcp.mjs';
-import { banner, box, c, meter, rule, spinner, symbols, table, termWidth, truncate } from '../cli/ui.mjs';
+import {
+  banner,
+  box,
+  c,
+  meter,
+  rule,
+  spinner,
+  symbols,
+  table,
+  termWidth,
+  truncate,
+} from '../cli/ui.mjs';
 
 const VERSION = '0.2.0';
 
@@ -74,9 +85,7 @@ function renderResults(resp, { showBanner = false } = {}) {
     lines.push(`${n} ${c.bold(truncate(r.title, w - 18))}${q}`);
     lines.push(`   ${c.cyan(truncate(r.url, w - 4))}`);
     const tags = (r.tags ?? []).slice(0, 4).join(' · ');
-    lines.push(
-      `   ${c.dim(truncate(r.excerpt ?? '', w - 4))}`,
-    );
+    lines.push(`   ${c.dim(truncate(r.excerpt ?? '', w - 4))}`);
     lines.push(
       `   ${c.gray(`${r.source} · ${r.type}${r.lang && r.lang !== 'und' ? ` · ${r.lang}` : ''}${tags ? ` · ${tags}` : ''}`)}`,
     );
@@ -100,7 +109,8 @@ function renderResults(resp, { showBanner = false } = {}) {
 const commands = {
   async search() {
     const q = positional.slice(1).join(' ').trim() || String(flags.q ?? '');
-    if (!q) die('Usage: zwep search <query> [--limit N] [--source NAME] [--type TYPE] [--semantic]');
+    if (!q)
+      die('Usage: zwep search <query> [--limit N] [--source NAME] [--type TYPE] [--semantic]');
     const spin = asJson ? null : spinner(`searching “${q}”…`);
     try {
       const resp = await client.search({
@@ -183,16 +193,17 @@ const commands = {
     if (asJson) return emit(null, g);
     if (!g.nodes.length) return out(c.dim(`No entities related to “${q}”.`));
     out(
-      table(
-        [...g.nodes].sort((a, b) => b.doc_count - a.doc_count).slice(0, 25),
-        [
-          { key: 'label', label: 'Entity' },
-          { key: 'type', label: 'Type' },
-          { key: 'doc_count', label: 'Docs', align: 'right' },
-        ],
+      table([...g.nodes].sort((a, b) => b.doc_count - a.doc_count).slice(0, 25), [
+        { key: 'label', label: 'Entity' },
+        { key: 'type', label: 'Type' },
+        { key: 'doc_count', label: 'Docs', align: 'right' },
+      ]),
+    );
+    out(
+      c.dim(
+        `\n${g.nodes.length} entities · ${g.edges.length} relations · ${g.stats.entities} in graph`,
       ),
     );
-    out(c.dim(`\n${g.nodes.length} entities · ${g.edges.length} relations · ${g.stats.entities} in graph`));
   },
 
   async status() {
@@ -256,7 +267,9 @@ const commands = {
         .map((s) => s.trim())
         .filter(Boolean);
       if (!name || !seeds.length) {
-        die('Usage: zwep sources add <name> --seed https://example.com[,https://…] [--domain example.com] [--max-pages 50]');
+        die(
+          'Usage: zwep sources add <name> --seed https://example.com[,https://…] [--domain example.com] [--max-pages 50]',
+        );
       }
       const domains = String(flags.domain ?? flags.domains ?? '')
         .split(',')
@@ -266,7 +279,9 @@ const commands = {
         name,
         type: 'web',
         seeds,
-        allowedDomains: domains.length ? domains : seeds.map((s) => new URL(s).hostname.replace(/^www\./, '')),
+        allowedDomains: domains.length
+          ? domains
+          : seeds.map((s) => new URL(s).hostname.replace(/^www\./, '')),
         maxPages: flags['max-pages'] ? Number(flags['max-pages']) : 50,
         maxDepth: flags['max-depth'] ? Number(flags['max-depth']) : undefined,
       };
@@ -337,7 +352,11 @@ const commands = {
   async repl() {
     if (!process.stdin.isTTY) die('zwep repl needs an interactive terminal.');
     out(banner('interactive search — type a query, or /help'));
-    const rl = createInterface({ input: process.stdin, output: process.stdout, prompt: c.orange('zwep › ') });
+    const rl = createInterface({
+      input: process.stdin,
+      output: process.stdout,
+      prompt: c.orange('zwep › '),
+    });
     rl.prompt();
     for await (const line of rl) {
       const q = line.trim();
@@ -368,12 +387,17 @@ const commands = {
           await commands.sources();
         } else if (q.startsWith('/graph ')) {
           const g = await client.graph(q.slice(7).trim());
-          out(g.nodes.map((n) => `  ${n.label} ${c.dim(`(${n.doc_count})`)}`).join('\n') || c.dim('(none)'));
+          out(
+            g.nodes.map((n) => `  ${n.label} ${c.dim(`(${n.doc_count})`)}`).join('\n') ||
+              c.dim('(none)'),
+          );
         } else if (q.startsWith('/ai ')) {
           const r = await client.overview(q.slice(4).trim());
           out(box('AI overview', wrap(r.overview || '(empty)', termWidth() - 8)));
         } else {
-          out(renderResults(await client.search({ q, limit: flags.limit ?? 8, highlight: 'false' })));
+          out(
+            renderResults(await client.search({ q, limit: flags.limit ?? 8, highlight: 'false' })),
+          );
         }
       } catch (e) {
         process.stderr.write(`${symbols.err} ${e.message}\n`);

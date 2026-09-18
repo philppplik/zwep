@@ -1,9 +1,4 @@
-import {
-  ollamaModels,
-  openrouterModels,
-  pushSettings,
-  type ModelInfo,
-} from '../client.ts';
+import { ollamaModels, openrouterModels, pushSettings, type ModelInfo } from '../client.ts';
 import { escapeHtml } from '../dom.ts';
 import {
   applyTheme,
@@ -227,14 +222,23 @@ function clamp(n: number, min: number, max: number): number {
   return Number.isFinite(n) ? Math.min(Math.max(n, min), max) : min;
 }
 
-function optionsHtml(models: ModelInfo[], presets: string[], selected: string, label: (m: ModelInfo) => string) {
+function optionsHtml(
+  models: ModelInfo[],
+  presets: string[],
+  selected: string,
+  label: (m: ModelInfo) => string,
+) {
   const known = new Set(models.map((m) => m.id));
   const fromApi = models.map(
-    (m) => `<option value="${escapeHtml(m.id)}" ${m.id === selected ? 'selected' : ''}>${escapeHtml(label(m))}</option>`,
+    (m) =>
+      `<option value="${escapeHtml(m.id)}" ${m.id === selected ? 'selected' : ''}>${escapeHtml(label(m))}</option>`,
   );
   const extra = presets
     .filter((p) => !known.has(p))
-    .map((p) => `<option value="${escapeHtml(p)}" ${p === selected ? 'selected' : ''}>${escapeHtml(p)}</option>`);
+    .map(
+      (p) =>
+        `<option value="${escapeHtml(p)}" ${p === selected ? 'selected' : ''}>${escapeHtml(p)}</option>`,
+    );
   const custom = !known.has(selected) && !presets.includes(selected);
   return [
     ...fromApi,

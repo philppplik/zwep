@@ -90,7 +90,9 @@ process.on('SIGINT', () => shutdown(0));
 process.on('SIGTERM', () => shutdown(0));
 
 if (await waitForApi()) {
-  console.log(`\n✓ API ready on http://127.0.0.1:${API_PORT} — open http://127.0.0.1:${WEB_PORT}\n`);
+  console.log(
+    `\n✓ API ready on http://127.0.0.1:${API_PORT} — open http://127.0.0.1:${WEB_PORT}\n`,
+  );
 } else if (!shuttingDown) {
   console.warn(
     `\n! API did not answer on :${API_PORT} within 45s.\n` +

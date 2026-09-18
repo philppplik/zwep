@@ -1,0 +1,63 @@
+name: Bug report
+description: Something behaves differently from what the docs describe.
+labels: [bug, needs-triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. The output of `zwep status --json` and the API
+        log around the failure usually make the difference between a guess and
+        a fix.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you got instead.
+      placeholder: |
+        I ran `zwep crawl example` and expected documents to be indexed.
+        Instead the task finished with indexed: 0 and no error.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part?
+      options:
+        - Crawler
+        - Extractor / indexer
+        - Search API
+        - Web UI
+        - CLI / MCP
+        - Setup and installation
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Output of `node -v`, your OS, and `zwep status --json`.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: API output, browser console, or CLI stderr. Redact any keys.
+      render: shell

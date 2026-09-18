@@ -1,0 +1,128 @@
+# Changelog
+
+All notable changes to this project are documented here.
+
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
+this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+## [0.2.0] — 2026-09-18
+
+The first release with a test suite, CI, and a command line. Most of this entry
+is repairs: the previous version had several defects that made documented
+features not work at all.
+
+### Added
+
+- **`zwep` CLI.** An ASCII terminal client covering search, suggest, document
+  fetch, AI overview, knowledge graph, index status, source management,
+  crawling and an interactive `repl`. `--json` on any command emits
+  machine-readable output, and colour disables itself when stdout is not a TTY.
+- **MCP server (`zwep mcp`).** Exposes the index to any MCP-capable agent over
+  stdio as JSON-RPC, with no dependencies. Read-only by default; the crawl
+  tools require both `--allow-write` and an admin key.
+- **Test suite.** 247 tests across three Vitest projects — services and
+  packages, jsdom component behaviour, and the CLI/MCP protocol. No test needs
+  a network or a running Meilisearch.
+- **CI.** Lint, formatting, types and the full suite on Ubuntu, Windows and
+  macOS across Node 22 and 24, plus CodeQL and a dependency audit.
+- **Search pagination** and **working facet filters** in the web UI.
+- **Theme selector** (system / light / dark) that follows the operating system.
+- **Admin key management** in Settings, replacing the hard-coded default.
+- `GET /v1/admin/crawl/:id` to poll a single crawl task.
+- `POST /v1/admin/clear-cache` to drop cached AI overviews.
+- `?purge=true` on source deletion, to remove that source's documents too.
+- Repository hygiene: `LICENSE`, `CONTRIBUTING.md`, `SECURITY.md`,
+  `CODE_OF_CONDUCT.md`, issue and pull-request templates, `CODEOWNERS`,
+  Dependabot, `.editorconfig`, `.nvmrc` and `.gitattributes`.
+
+### Fixed
+
+- **`POST /v1/settings` threw a `ReferenceError`.** `applyRuntimeLlmSettings`
+  was called but never imported.
+- **Three Library actions threw a `ReferenceError` on click.** "Crawl all",
+  "Clear index" and "Index URL" called functions the module never imported.
+- **Crawl progress never resolved.** The UI polled `GET /v1/admin/crawl/:id`,
+  which did not exist, so every single-source crawl polled a 404 forever.
+- **Setting `GOOGLE_PROXY_ENABLED=true` crashed the API at boot.** The variable
+  was declared as a boolean, but environment variables are strings, so the
+  schema threw — and that value is exactly what the API's own error message
+  told you to set.
+- **`npm run build` and `npm run typecheck` failed on a clean checkout.** There
+  was no root `tsconfig.json`.
+- **Re-crawling a changed page duplicated it.** The document id hashed the page
+  content, so any change minted a new id and orphaned the previous revision.
+  The id now derives from the source and canonical URL, as documented.
+- **Enabling or disabling a source did nothing.** `enabled` was missing from
+  the validation schema, and Zod strips unknown keys, so the value was
+  discarded on every save.
+- **Semantic search always returned a 400.** The hybrid query omitted the
+  embedder name, which Meilisearch rejects. Embeddings were also written to
+  `_embeddings` instead of `_vectors`, so they were never used.
+- **Search highlights were requested but discarded.** They are now returned in
+  a typed `highlighted` field.
+- **The language facet split every language in two.** `franc` reports ISO 639-3
+  (`deu`) while HTML `lang` gives ISO 639-1 (`de`); both are normalized now.
+- **The junk-page filter could never fire**, because it required an empty title
+  and the title falls back to the URL.
+- **Browser back and forward were broken** in the single-page app, and the
+  "← Search" button was bound to the wrong element and did nothing.
+- **Facet chips did nothing.** They were rendered as buttons with no handler.
+- **The knowledge graph stored mirrored duplicate edges**, and its organisation
+  detection was unreachable because the entity pattern could not match `GmbH`,
+  `AG` or `LLC`.
+- **Quality freshness scores drifted** in a long-running server: the clock was
+  captured once at module load.
+- **`npm run dev` never worked on Windows.** The runner derived its working
+  directory from a `file:` URL's `pathname`, which yields `/C:/Users/...`.
+- **The graph view leaked** a `resize` listener and an animation-frame loop that
+  kept running after navigating away.
+- A transient provider failure disabled embeddings or the LLM for the entire
+  process lifetime; failures now back off for 60 seconds.
+
+### Security
+
+- **`POST /v1/settings` was unauthenticated**, letting any visitor of the web UI
+  repoint the server's LLM provider and read back its configuration. It is now
+  admin-gated like every other mutating endpoint.
+- The admin key is sent in the `x-admin-key` header instead of a query
+  parameter, so it no longer lands in browser history, referrers or proxy logs.
+  Comparison is constant-time.
+- Search filter values are quoted, closing a filter-injection hole on the
+  `source`, `tag` and `lang` parameters.
+- Added an in-process rate limiter (`API_RATE_LIMIT`, default 120/min).
+- The API binds `127.0.0.1` by default instead of `0.0.0.0`.
+- The crawler enforces a fetch timeout, a content-type check and a response
+  size cap, and refuses to leave the configured domains even when the
+  allow-list is empty.
+- **Removed the Google Fonts and rsms.me stylesheet links from the web UI.**
+  Zwep's premise is that queries never leave your infrastructure, but a font
+  CDN receives every page view — and the referrer carries the search query.
+- `npm audit` reports zero vulnerabilities, down from seven.
+
+### Changed
+
+- The Admin console is now called **Library**, and reads as a source-management
+  screen rather than a debug panel. `/admin` still routes there.
+- The UI is English throughout; the AI overview box was previously German.
+- Native `confirm()` dialogs replaced with accessible in-app dialogs.
+- The API entry point is split into `app.ts` (buildable and testable) and
+  `server.ts` (binds the port).
+- Empty and error states name the command that fixes the situation.
+- Accessibility: consistent focus ring, skip link, ARIA combobox semantics on
+  suggestions, focus trapping in modals, live regions, and support for
+  `prefers-reduced-motion`.
+- The source table reflows into cards on screens under 720px.
+- `README.md` rewritten; it previously described the project as being in the
+  "design phase" while the whole engine was built.
+
+### Removed
+
+- `start-dev.sh` and `start-dev.bat`, superseded by the cross-platform
+  `npm run dev`.
+- `scripts/probe-google.ts` and `scripts/smoke-admin.ts`, superseded by the
+  test suite.
+
+[Unreleased]: https://github.com/philppplik/zwep/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/philppplik/zwep/releases/tag/v0.2.0

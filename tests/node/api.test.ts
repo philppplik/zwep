@@ -33,7 +33,14 @@ beforeEach(async () => {
   process.env.API_RATE_LIMIT = '0';
   process.env.GOOGLE_PROXY_ENABLED = 'false';
   reloadEnv();
-  saveSources([{ name: 'alpha', type: 'web', seeds: ['https://example.com/'], allowedDomains: ['example.com'] }]);
+  saveSources([
+    {
+      name: 'alpha',
+      type: 'web',
+      seeds: ['https://example.com/'],
+      allowedDomains: ['example.com'],
+    },
+  ]);
   app = await build({ indexer: stubIndexer(), logger: false });
 });
 
@@ -189,7 +196,9 @@ describe('PUT /v1/admin/sources', () => {
     });
     expect(res.statusCode).toBe(200);
     const list = await app.inject({ url: '/v1/admin/sources', headers: admin });
-    expect(list.json().sources.find((s: { name: string }) => s.name === 'alpha').enabled).toBe(false);
+    expect(list.json().sources.find((s: { name: string }) => s.name === 'alpha').enabled).toBe(
+      false,
+    );
   });
 
   it('refuses a google source while the proxy is disabled', async () => {
@@ -206,7 +215,11 @@ describe('PUT /v1/admin/sources', () => {
 
 describe('DELETE /v1/admin/sources/:name', () => {
   it('404s for an unknown source', async () => {
-    const res = await app.inject({ method: 'DELETE', url: '/v1/admin/sources/ghost', headers: admin });
+    const res = await app.inject({
+      method: 'DELETE',
+      url: '/v1/admin/sources/ghost',
+      headers: admin,
+    });
     expect(res.statusCode).toBe(404);
   });
 

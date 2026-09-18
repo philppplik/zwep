@@ -58,7 +58,9 @@ function parseGoogleResults(html: string): string[] {
 function isGoogleOwned(link: string): boolean {
   try {
     const h = new URL(link).hostname.replace(/^www\./, '');
-    return h.endsWith('google.com') || h.endsWith('gstatic.com') || h.endsWith('googleusercontent.com');
+    return (
+      h.endsWith('google.com') || h.endsWith('gstatic.com') || h.endsWith('googleusercontent.com')
+    );
   } catch {
     return false;
   }

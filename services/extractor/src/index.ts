@@ -50,7 +50,9 @@ function jsonLdBlocks(doc: Dom): Record<string, unknown>[] {
 function findLd(blocks: Record<string, unknown>[], type: string): Record<string, unknown> | null {
   for (const item of blocks) {
     const t = item['@type'];
-    if (Array.isArray(t) ? t.some((x) => String(x).includes(type)) : String(t ?? '').includes(type)) {
+    if (
+      Array.isArray(t) ? t.some((x) => String(x).includes(type)) : String(t ?? '').includes(type)
+    ) {
       return item;
     }
   }
@@ -97,7 +99,15 @@ function faviconUrl(doc: Dom, base: string): string | undefined {
 /** Pick the richest JSON-LD entity for the knowledge card. */
 function structuredData(blocks: Record<string, unknown>[]): Record<string, unknown> | null {
   if (!blocks.length) return null;
-  const priority = ['Product', 'VideoObject', 'NewsArticle', 'Article', 'Organization', 'Person', 'WebSite'];
+  const priority = [
+    'Product',
+    'VideoObject',
+    'NewsArticle',
+    'Article',
+    'Organization',
+    'Person',
+    'WebSite',
+  ];
   const rank = (b: Record<string, unknown>) => {
     const t = typeOf(b);
     const i = priority.findIndex((p) => t.includes(p));
@@ -221,7 +231,9 @@ export function extract(page: CrawlPage, source: string): Document | null {
     // Hashing the *content* (not the raw HTML) means a page whose ads or CSRF
     // token changed still hashes identically — that is what makes change
     // detection useful.
-    content_hash: createHash('sha256').update(content || title).digest('hex'),
+    content_hash: createHash('sha256')
+      .update(content || title)
+      .digest('hex'),
     tags,
     favicon: faviconUrl(doc, page.canonical_url),
     structured: structuredData(blocks),

@@ -105,9 +105,7 @@ export class Indexer {
         score: typeof _rankingScore === 'number' ? _rankingScore : 0,
         // Highlighted variants are kept in dedicated fields so consumers can
         // choose between safe plain text and pre-marked HTML.
-        highlighted: highlight
-          ? { title: formatted.title, excerpt: formatted.excerpt }
-          : undefined,
+        highlighted: highlight ? { title: formatted.title, excerpt: formatted.excerpt } : undefined,
       };
     });
 

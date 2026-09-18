@@ -164,14 +164,16 @@ export class LibraryView {
       }
     });
 
-    head.querySelector<HTMLFormElement>('[data-act="crawl-url-form"]')!.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const input = head.querySelector<HTMLInputElement>('#crawl-url')!;
-      const url = input.value.trim();
-      if (!url) return;
-      input.value = '';
-      void this.crawlUrl(url);
-    });
+    head
+      .querySelector<HTMLFormElement>('[data-act="crawl-url-form"]')!
+      .addEventListener('submit', (e) => {
+        e.preventDefault();
+        const input = head.querySelector<HTMLInputElement>('#crawl-url')!;
+        const url = input.value.trim();
+        if (!url) return;
+        input.value = '';
+        void this.crawlUrl(url);
+      });
   }
 
   private renderTable(): void {
@@ -264,7 +266,9 @@ export class LibraryView {
     if (!src) return;
     try {
       await adminUpsertSource(this.adminKey, { ...src, enabled });
-      this.toast(`${name} is now ${enabled ? 'active — included in search' : 'inactive — excluded from search'}`);
+      this.toast(
+        `${name} is now ${enabled ? 'active — included in search' : 'inactive — excluded from search'}`,
+      );
     } catch (e) {
       this.toast((e as Error).message, 'error');
     }
@@ -379,7 +383,9 @@ export class LibraryView {
         this.stopPolling();
         if (task.status === 'done') {
           const s = task.summary!;
-          this.toast(`Crawl finished: ${s.indexed} indexed, ${s.pages} fetched, ${s.failed} failed`);
+          this.toast(
+            `Crawl finished: ${s.indexed} indexed, ${s.pages} fetched, ${s.failed} failed`,
+          );
         } else {
           this.toast(`Crawl failed: ${task.error}`, 'error');
         }
@@ -455,7 +461,12 @@ export class LibraryView {
   // -------------------------------------------------------------------------
 
   /** In-app confirmation dialog, replacing the blocking native `confirm()`. */
-  private confirm(title: string, message: string, action: string, danger = false): Promise<boolean> {
+  private confirm(
+    title: string,
+    message: string,
+    action: string,
+    danger = false,
+  ): Promise<boolean> {
     return new Promise((resolve) => {
       const overlay = document.createElement('div');
       overlay.className = 'z-modal__overlay';
@@ -595,7 +606,8 @@ export class LibraryView {
 
     overlay.querySelector('form')!.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const val = (sel: string) => overlay.querySelector<HTMLInputElement | HTMLTextAreaElement>(sel)!.value;
+      const val = (sel: string) =>
+        overlay.querySelector<HTMLInputElement | HTMLTextAreaElement>(sel)!.value;
       const lines = (sel: string) =>
         val(sel)
           .split('\n')

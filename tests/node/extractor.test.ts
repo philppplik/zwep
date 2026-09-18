@@ -80,7 +80,12 @@ describe('extract', () => {
   it('skips a navigation-only shell', () => {
     // Regression guard: the old condition `!title && content.length < 60`
     // could never fire, because the title falls back to the URL.
-    const doc = extract(page('<html><head><title>Menu</title></head><body><nav><a href="/a">A</a></nav></body></html>'), 's');
+    const doc = extract(
+      page(
+        '<html><head><title>Menu</title></head><body><nav><a href="/a">A</a></nav></body></html>',
+      ),
+      's',
+    );
     expect(doc).toBeNull();
   });
 
@@ -150,9 +155,14 @@ describe('extract', () => {
   });
 
   it('hashes content, not raw HTML, so cosmetic markup churn is not a change', () => {
-    const a = extract(page(`<html><head><title>T</title></head><body><div>${BODY}</div></body></html>`), 's');
+    const a = extract(
+      page(`<html><head><title>T</title></head><body><div>${BODY}</div></body></html>`),
+      's',
+    );
     const b = extract(
-      page(`<html><head><title>T</title></head><body><section class="new"><div>${BODY}</div></section></body></html>`),
+      page(
+        `<html><head><title>T</title></head><body><section class="new"><div>${BODY}</div></section></body></html>`,
+      ),
       's',
     );
     expect(a!.content_hash).toBe(b!.content_hash);

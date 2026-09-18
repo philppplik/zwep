@@ -5,15 +5,8 @@
     "composite": false,
     "declaration": false,
     "allowImportingTsExtensions": true,
-    "lib": [
-      "ES2023",
-      "DOM",
-      "DOM.Iterable"
-    ],
-    "types": [
-      "node",
-      "vitest/globals"
-    ],
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["node", "vitest/globals"],
     "allowJs": true,
     "checkJs": false
   },
@@ -26,9 +19,5 @@
     "cli/**/*.mjs",
     "bin/**/*.mjs"
   ],
-  "exclude": [
-    "node_modules",
-    "**/dist",
-    "web"
-  ]
+  "exclude": ["node_modules", "**/dist", "web"]
 }

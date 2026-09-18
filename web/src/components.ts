@@ -229,7 +229,8 @@ export class SearchBar {
       n.setAttribute('aria-selected', String(on));
       if (on) n.scrollIntoView({ block: 'nearest' });
     });
-    if (this.active >= 0) this.input.setAttribute('aria-activedescendant', `z-suggest-${this.active}`);
+    if (this.active >= 0)
+      this.input.setAttribute('aria-activedescendant', `z-suggest-${this.active}`);
     else this.input.removeAttribute('aria-activedescendant');
   }
 
@@ -364,7 +365,9 @@ export class ResultList {
               aria-pressed="${on}">${escapeHtml(value)} <span>${n}</span></button>`;
         })
         .join('');
-      return chips ? `<div class="z-facets__group"><span class="z-facets__label">${label}</span>${chips}</div>` : '';
+      return chips
+        ? `<div class="z-facets__group"><span class="z-facets__label">${label}</span>${chips}</div>`
+        : '';
     }).join('');
     if (!groups) return '';
     const clear = this.activeFacets.size
@@ -394,7 +397,9 @@ export class ResultList {
       e.stopPropagation();
       const pop = info.parentElement?.querySelector('.z-quality__pop');
       const wasOpen = pop?.classList.contains('is-open');
-      this.el.querySelectorAll('.z-quality__pop.is-open').forEach((p) => p.classList.remove('is-open'));
+      this.el
+        .querySelectorAll('.z-quality__pop.is-open')
+        .forEach((p) => p.classList.remove('is-open'));
       if (!wasOpen) pop?.classList.add('is-open');
       info.setAttribute('aria-expanded', String(!wasOpen));
       return;
@@ -519,13 +524,16 @@ function knowledgeCardHtml(doc: SearchResult): string {
   const row = (label: string, value: string) =>
     value ? `<div class="z-card__row"><span>${label}</span><b>${escapeHtml(value)}</b></div>` : '';
   rows.push(row('Author', pick(s.author)));
-  rows.push(row('Published', formatDate(typeof s.datePublished === 'string' ? s.datePublished : undefined)));
+  rows.push(
+    row('Published', formatDate(typeof s.datePublished === 'string' ? s.datePublished : undefined)),
+  );
   rows.push(row('Brand', pick(s.brand)));
   const offers = s.offers as { price?: unknown; priceCurrency?: unknown } | undefined;
   const price = offers?.price ?? s.price;
   rows.push(row('Price', price ? `${price} ${offers?.priceCurrency ?? ''}`.trim() : ''));
 
-  const img = typeof s.image === 'string' ? s.image : Array.isArray(s.image) ? String(s.image[0]) : '';
+  const img =
+    typeof s.image === 'string' ? s.image : Array.isArray(s.image) ? String(s.image[0]) : '';
   const type = String(s['@type'] ?? '');
   const name = pick(s.name) || pick(s.headline) || doc.title;
   const desc = typeof s.description === 'string' ? s.description : '';
@@ -587,9 +595,9 @@ export function openPreview(doc: SearchResult): void {
     setTimeout(() => overlay.remove(), 180);
   }
 
-  overlay.querySelectorAll<HTMLElement>('[data-close]').forEach((n) =>
-    n.addEventListener('click', close),
-  );
+  overlay
+    .querySelectorAll<HTMLElement>('[data-close]')
+    .forEach((n) => n.addEventListener('click', close));
 }
 
 // ---------------------------------------------------------------------------

@@ -234,7 +234,9 @@ export class KnowledgeGraph {
     // expand one hop
     const seenEdge = new Set<string>();
     for (const s of seeds) {
-      const out = this.db.prepare('SELECT * FROM edges WHERE src = ? OR dst = ? ORDER BY weight DESC LIMIT ?').all(s.id, s.id, depth * 10) as GraphEdge[];
+      const out = this.db
+        .prepare('SELECT * FROM edges WHERE src = ? OR dst = ? ORDER BY weight DESC LIMIT ?')
+        .all(s.id, s.id, depth * 10) as GraphEdge[];
       for (const e of out) {
         const key = `${e.src}|${e.dst}|${e.kind}`;
         if (seenEdge.has(key)) continue;
@@ -258,7 +260,9 @@ export class KnowledgeGraph {
 
   /** Export the full graph (all entities + edges) as a shareable object. */
   all(): { nodes: GraphNode[]; edges: GraphEdge[]; stats: { entities: number; edges: number } } {
-    const nodes = this.db.prepare('SELECT * FROM entities ORDER BY doc_count DESC').all() as GraphNode[];
+    const nodes = this.db
+      .prepare('SELECT * FROM entities ORDER BY doc_count DESC')
+      .all() as GraphNode[];
     const edges = this.db.prepare('SELECT * FROM edges ORDER BY weight DESC').all() as GraphEdge[];
     return { nodes, edges, stats: this.stats() };
   }
@@ -269,7 +273,11 @@ export class KnowledgeGraph {
 }
 
 function slug(s: string): string {
-  return s.toLowerCase().replace(/[^a-z0-9äöüß]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 64);
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9äöüß]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 64);
 }
 
 /**
@@ -311,11 +319,79 @@ function guessType(label: string): string {
 }
 
 const STOPWORDS = new Set([
-  'the', 'and', 'for', 'with', 'this', 'that', 'from', 'your', 'are', 'was', 'were',
-  'have', 'has', 'will', 'can', 'not', 'but', 'they', 'their', 'our', 'all', 'more',
-  'what', 'when', 'where', 'which', 'who', 'how', 'why', 'der', 'die', 'das', 'und',
-  'für', 'mit', 'nicht', 'ein', 'eine', 'ist', 'sind', 'werden', 'wird', 'auf', 'von',
-  'im', 'am', 'an', 'als', 'wie', 'nach', 'über', 'zum', 'zur', 'des', 'dem', 'den',
-  'about', 'into', 'than', 'then', 'them', 'there', 'here', 'also', 'been', 'being',
-  'search', 'results', 'result', 'page', 'website', 'home', 'menu', 'privacy', 'imprint',
+  'the',
+  'and',
+  'for',
+  'with',
+  'this',
+  'that',
+  'from',
+  'your',
+  'are',
+  'was',
+  'were',
+  'have',
+  'has',
+  'will',
+  'can',
+  'not',
+  'but',
+  'they',
+  'their',
+  'our',
+  'all',
+  'more',
+  'what',
+  'when',
+  'where',
+  'which',
+  'who',
+  'how',
+  'why',
+  'der',
+  'die',
+  'das',
+  'und',
+  'für',
+  'mit',
+  'nicht',
+  'ein',
+  'eine',
+  'ist',
+  'sind',
+  'werden',
+  'wird',
+  'auf',
+  'von',
+  'im',
+  'am',
+  'an',
+  'als',
+  'wie',
+  'nach',
+  'über',
+  'zum',
+  'zur',
+  'des',
+  'dem',
+  'den',
+  'about',
+  'into',
+  'than',
+  'then',
+  'them',
+  'there',
+  'here',
+  'also',
+  'been',
+  'being',
+  'search',
+  'results',
+  'result',
+  'page',
+  'website',
+  'home',
+  'menu',
+  'privacy',
+  'imprint',
 ]);

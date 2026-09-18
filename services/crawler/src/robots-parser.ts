@@ -21,5 +21,4 @@ type Factory = (url: string, robotsTxt: string) => RobotsRules;
 const impl = createRobots as unknown as Factory & { default?: Factory };
 
 /** Parse a robots.txt body into a rules object. */
-export const robotsParser: Factory = (url, robotsTxt) =>
-  (impl.default ?? impl)(url, robotsTxt);
+export const robotsParser: Factory = (url, robotsTxt) => (impl.default ?? impl)(url, robotsTxt);
