@@ -7,6 +7,8 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-09-18
+
 ### Added
 
 - **The CLI starts Zwep for you.** A command that needs the API now starts a
@@ -29,6 +31,8 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - `GET /v1/version` and `GET /v1/update` on the API.
 - `zwep status` now reports the CLI version, the installation path, and whether
   the running server was started by this CLI.
+- The CLI version is read from package.json instead of being hardcoded in three
+  places — 0.3.0 nearly shipped with the MCP server still announcing 0.2.0.
 
 ### Changed
 
@@ -177,5 +181,6 @@ features not work at all.
 - `scripts/probe-google.ts` and `scripts/smoke-admin.ts`, superseded by the
   test suite.
 
-[Unreleased]: https://github.com/philppplik/zwep/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/philppplik/zwep/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/philppplik/zwep/releases/tag/v0.3.0
 [0.2.0]: https://github.com/philppplik/zwep/releases/tag/v0.2.0

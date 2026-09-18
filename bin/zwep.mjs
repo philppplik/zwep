@@ -12,6 +12,7 @@
 import process from 'node:process';
 import { createInterface } from 'node:readline';
 import { parseArgs } from '../cli/args.mjs';
+import { VERSION } from '../cli/version.mjs';
 import { ZwepClient, ZwepApiError, waitForTask } from '../cli/api.mjs';
 import { runMcpStdio } from '../cli/mcp.mjs';
 import {
@@ -39,8 +40,6 @@ import {
   termWidth,
   truncate,
 } from '../cli/ui.mjs';
-
-const VERSION = '0.2.0';
 
 // ---------------------------------------------------------------------------
 // Argument parsing
