@@ -1,4 +1,4 @@
-import { MeiliSearch, type Index, type Settings, type SearchParams } from 'meilisearch';
+import { Meilisearch, type Index, type Settings, type SearchParams } from 'meilisearch';
 import type { Document } from '@zwep/shared';
 import { loadEnv } from '@zwep/config';
 import { getEmbedProvider, resetEmbedProvider } from '@zwep/embed';
@@ -26,13 +26,13 @@ const SORTABLE = ['published_at', 'crawled_at'];
 const RANKING = ['words', 'typo', 'proximity', 'attribute', 'sort', 'exactness'];
 
 export class MeiliAdapter implements IndexAdapter {
-  private client: MeiliSearch;
+  private client: Meilisearch;
   private index: Index<Document>;
   private embedder: string | null = null;
 
   constructor() {
     const env = loadEnv();
-    this.client = new MeiliSearch({ host: env.MEILI_HOST, apiKey: env.MEILI_MASTER_KEY });
+    this.client = new Meilisearch({ host: env.MEILI_HOST, apiKey: env.MEILI_MASTER_KEY });
     this.index = this.client.index<Document>(env.MEILI_INDEX);
   }
 
@@ -50,8 +50,7 @@ export class MeiliAdapter implements IndexAdapter {
         () => false,
       );
     if (!exists) {
-      const created = await this.client.createIndex(uid, { primaryKey: 'id' });
-      await this.client.waitForTask(created.taskUid);
+      await this.client.createIndex(uid, { primaryKey: 'id' }).waitTask();
     }
 
     const settings: Settings = {
@@ -80,8 +79,7 @@ export class MeiliAdapter implements IndexAdapter {
       this.embedder = null;
     }
 
-    const task = await this.index.updateSettings(settings);
-    await this.index.waitForTask(task.taskUid);
+    await this.index.updateSettings(settings).waitTask();
   }
 
   async upsert(docs: Document[]): Promise<void> {
@@ -99,23 +97,19 @@ export class MeiliAdapter implements IndexAdapter {
         resetEmbedProvider();
       }
     }
-    const task = await this.index.addDocuments(docs as never[], { primaryKey: 'id' });
-    await this.index.waitForTask(task.taskUid);
+    await this.index.addDocuments(docs as never[], { primaryKey: 'id' }).waitTask();
   }
 
   async delete(id: string): Promise<void> {
-    const task = await this.index.deleteDocument(id);
-    await this.index.waitForTask(task.taskUid);
+    await this.index.deleteDocument(id).waitTask();
   }
 
   async deleteBySource(source: string): Promise<void> {
-    const task = await this.index.deleteDocuments({ filter: `source = ${quote(source)}` });
-    await this.index.waitForTask(task.taskUid);
+    await this.index.deleteDocuments({ filter: `source = ${quote(source)}` }).waitTask();
   }
 
   async deleteAll(): Promise<void> {
-    const task = await this.index.deleteAllDocuments();
-    await this.index.waitForTask(task.taskUid);
+    await this.index.deleteAllDocuments().waitTask();
   }
 
   async get(id: string): Promise<Document | null> {

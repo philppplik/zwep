@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
-import yaml from 'js-yaml';
+// js-yaml 5 dropped its default export in favour of named ones.
+import { load as parseYaml } from 'js-yaml';
 import { z } from 'zod';
 import type { SourceConfig } from '@zwep/shared';
 import { loadDotEnv, REPO_ROOT } from './env.ts';
@@ -149,7 +150,7 @@ export function sourcesYamlPath(): string {
 
 function seedFromYaml(): SourceConfig[] {
   const file = sourcesYamlPath();
-  const raw = yaml.load(readFileSync(file, 'utf8')) as unknown;
+  const raw = parseYaml(readFileSync(file, 'utf8')) as unknown;
   const arr = Array.isArray(raw) ? raw : (raw as { sources?: unknown })?.sources;
   if (!Array.isArray(arr)) throw new Error(`No sources array in ${file}`);
   return arr.map((s) => sourceSchema.parse(s) as SourceConfig);
