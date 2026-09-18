@@ -1,9 +1,17 @@
 {
   "name": "zwep",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "A small, self-hosted search engine — crawler + index + API.",
+  "description": "A small, self-hosted search engine — crawler + index + API + UI + agent-friendly CLI.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/philppplik/zwep.git"
+  },
+  "bugs": {
+    "url": "https://github.com/philppplik/zwep/issues"
+  },
+  "homepage": "https://github.com/philppplik/zwep#readme",
   "type": "module",
   "workspaces": [
     "packages/*",
@@ -11,19 +19,42 @@
     "web"
   ],
   "engines": {
-    "node": ">=20"
+    "node": ">=22.6"
+  },
+  "bin": {
+    "zwep": "./bin/zwep.mjs"
   },
   "scripts": {
-    "build": "tsc -b",
-    "typecheck": "tsc -b --noEmit",
-    "api": "node --experimental-strip-types services/api/src/server.ts",
-    "crawl": "node --experimental-strip-types services/worker/src/cli.ts",
     "dev": "node scripts/dev-runner.mjs",
+    "api": "node --experimental-strip-types services/api/src/server.ts",
+    "cli": "node bin/zwep.mjs",
+    "crawl": "node --experimental-strip-types services/worker/src/cli.ts crawl",
+    "build": "npm run build --workspace web",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p web/tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "verify": "npm run lint && npm run typecheck && npm run test",
     "infra:up": "docker compose up -d meilisearch redis",
     "infra:down": "docker compose down"
   },
   "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/js-yaml": "^4.0.9",
+    "@types/jsdom": "^21.1.7",
     "@types/node": "^22.10.0",
-    "typescript": "^5.7.2"
+    "@vitest/coverage-v8": "^5.0.1",
+    "eslint": "^9.17.0",
+    "globals": "^15.14.0",
+    "jsdom": "^25.0.1",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.19.0",
+    "vitest": "^5.0.1"
   }
 }

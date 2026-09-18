@@ -19,8 +19,19 @@ export const WEIGHTS = {
   structure: 0.15,
 } as const;
 
-const NOW = Date.now();
 const YEAR_MS = 365 * 24 * 60 * 60 * 1000;
+
+/**
+ * Injectable clock. A module-level `Date.now()` constant would freeze the
+ * moment the process booted, so a long-running API would slowly drift into
+ * scoring every document as fresher than it is — and tests could not pin it.
+ */
+let now: () => number = () => Date.now();
+
+/** Test seam: pin the clock used by freshness scoring. */
+export function setQualityClock(fn: (() => number) | null): void {
+  now = fn ?? (() => Date.now());
+}
 
 function lengthScore(textLen: number): number {
   // log scale: ~200 chars -> 0.3, ~1200 -> 0.9, >3000 -> ~1.0
@@ -33,7 +44,7 @@ function freshnessScore(publishedAt?: string): number {
   if (!publishedAt) return 1; // unknown age is not penalised
   const t = Date.parse(publishedAt);
   if (Number.isNaN(t)) return 1;
-  const age = NOW - t;
+  const age = now() - t;
   if (age < 0) return 1;
   // 0 years -> 1.0, 2+ years -> 0.2 floor
   const years = age / YEAR_MS;
