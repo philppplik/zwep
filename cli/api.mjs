@@ -58,9 +58,9 @@ export class ZwepClient {
     } catch (e) {
       const hint =
         e?.name === 'TimeoutError'
-          ? `Timed out after ${(timeoutMs ?? this.timeoutMs) / 1000}s`
-          : `Cannot reach the Zwep API at ${this.base}`;
-      throw new ZwepApiError(`${hint}. Is it running? (npm run dev)`, {
+          ? `Timed out after ${(timeoutMs ?? this.timeoutMs) / 1000}s.`
+          : `Cannot reach the Zwep API at ${this.base}.`;
+      throw new ZwepApiError(`${hint} Start one with: zwep up`, {
         code: 'unreachable',
         url,
       });

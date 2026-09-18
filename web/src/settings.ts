@@ -19,6 +19,8 @@ export interface ZwepSettings {
   openrouterModel: string;
   openrouterKey: string;
   adminKey: string;
+  /** Check npm for a newer release once a day. */
+  autoUpdateCheck: boolean;
 }
 
 export const DEFAULT_SETTINGS: ZwepSettings = {
@@ -31,6 +33,7 @@ export const DEFAULT_SETTINGS: ZwepSettings = {
   openrouterModel: 'openai/gpt-4o-mini',
   openrouterKey: '',
   adminKey: '',
+  autoUpdateCheck: true,
 };
 
 const KEY = 'zwep.settings';

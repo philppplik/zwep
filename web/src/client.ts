@@ -145,6 +145,36 @@ export function stats(): Promise<StatsResponse> {
   return request<StatsResponse>('/stats');
 }
 
+export interface VersionResponse {
+  version: string;
+  api: string;
+  node: string;
+  platform: string;
+}
+
+export function version(): Promise<VersionResponse> {
+  return request<VersionResponse>('/version');
+}
+
+export interface UpdateStatus {
+  current: string;
+  latest: string | null;
+  updateAvailable: boolean;
+  checkedAt: string | null;
+  cached: boolean;
+  error?: string;
+}
+
+/**
+ * Ask the server whether a newer release exists.
+ *
+ * The server makes the registry request, not the browser — so npm never sees a
+ * referrer carrying whatever you were searching for.
+ */
+export function checkUpdate(force = false): Promise<UpdateStatus> {
+  return request<UpdateStatus>(`/update${force ? '?force=true' : ''}`, { timeoutMs: 15_000 });
+}
+
 export interface GraphNode {
   id: string;
   label: string;

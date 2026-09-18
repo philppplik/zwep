@@ -1731,3 +1731,48 @@ textarea {
     border: 1px solid ButtonBorder;
   }
 }
+
+/* --- Update panel ---------------------------------------------------------- */
+
+.z-update {
+  margin: var(--z-space-3) 0 0;
+  padding: var(--z-space-3) var(--z-space-4);
+  border: 1px solid var(--z-border);
+  border-radius: var(--z-radius-md);
+  background: var(--z-bg);
+  font-size: var(--z-text-sm);
+  line-height: var(--z-leading-relaxed);
+}
+
+.z-update strong {
+  display: block;
+  margin-bottom: var(--z-space-1);
+}
+
+.z-update span {
+  color: var(--z-text-secondary);
+}
+
+.z-update ul {
+  margin: var(--z-space-2) 0;
+  padding-left: var(--z-space-5);
+}
+
+.z-update li {
+  margin-bottom: var(--z-space-1);
+}
+
+.z-update.is-ok {
+  border-color: color-mix(in srgb, var(--z-ok) 30%, transparent);
+  background: var(--z-ok-soft);
+}
+
+.z-update.is-warn {
+  border-color: color-mix(in srgb, var(--z-warn) 34%, transparent);
+  background: var(--z-warn-soft);
+}
+
+.z-update.is-update {
+  border-color: color-mix(in srgb, var(--z-accent) 34%, transparent);
+  background: var(--z-accent-soft);
+}

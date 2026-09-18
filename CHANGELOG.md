@@ -7,6 +7,29 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Added
+
+- **The CLI starts Zwep for you.** A command that needs the API now starts a
+  local installation in the background and waits for it, instead of failing with
+  "cannot reach the API". It only does this for a loopback `ZWEP_API` and only
+  when it can find a checkout — starting a local server while you are pointed at
+  a remote one would silently search the wrong index. `--no-auto-start` or
+  `ZWEP_NO_AUTOSTART=1` opts out.
+- `zwep up [--web]` and `zwep down` to control the background server
+  explicitly. `up` also brings up Meilisearch through Docker when it is
+  available, and reports plainly when it is not.
+- `zwep update` reports whether a newer release exists and prints the command
+  that matches how this copy was installed — global, project-local, npx or a git
+  checkout each need a different one. A once-a-day notice appears after other
+  commands.
+- **Settings → Updates** in the web UI: the running version, a "Check for
+  updates" button, and an automatic daily check that can be switched off. The
+  registry request is made by the server, never the browser, so npm never
+  receives a referrer carrying a search query.
+- `GET /v1/version` and `GET /v1/update` on the API.
+- `zwep status` now reports the CLI version, the installation path, and whether
+  the running server was started by this CLI.
+
 ### Changed
 
 - Upgraded the whole dependency tree: eslint 9 to 10, TypeScript 5.9 to 6,
