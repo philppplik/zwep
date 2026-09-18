@@ -25,6 +25,7 @@ import {
 } from '@zwep/llm';
 import type { SearchSort, SourceConfig } from '@zwep/shared';
 import { TaskRegistry } from './tasks.ts';
+import { VERSION, checkForUpdate } from './version.ts';
 
 /** How many results the AI Overview summarizes. */
 const OVERVIEW_CONTEXT_SIZE = 5;
@@ -83,6 +84,23 @@ export async function build(opts: BuildOptions = {}): Promise<FastifyInstance> {
   // -------------------------------------------------------------------------
 
   app.get('/healthz', async () => ({ ok: true, service: 'zwep-api', version: 'v1' }));
+
+  app.get('/v1/version', async () => ({
+    version: VERSION,
+    api: 'v1',
+    node: process.version,
+    platform: process.platform,
+  }));
+
+  /**
+   * Update check. Public read, because knowing your own version is not
+   * sensitive — but the outbound request is made here rather than by the
+   * browser, so the registry never sees who is searching. Pass ?force=true to
+   * skip the one-hour cache.
+   */
+  app.get('/v1/update', async (req) => {
+    return checkForUpdate(isTrue((req.query as Record<string, unknown>).force));
+  });
 
   app.get('/v1/stats', async (_req, reply) => {
     try {

@@ -1,4 +1,12 @@
-import { ollamaModels, openrouterModels, pushSettings, type ModelInfo } from '../client.ts';
+import {
+  checkUpdate,
+  ollamaModels,
+  openrouterModels,
+  pushSettings,
+  version,
+  type ModelInfo,
+  type UpdateStatus,
+} from '../client.ts';
 import { escapeHtml } from '../dom.ts';
 import {
   applyTheme,
@@ -126,6 +134,35 @@ export function renderSettings(mount: HTMLElement): () => void {
       </div>
       <p class="z-settings__status" id="admin-status" role="status"></p>
     </section>
+
+    <section class="z-settings__card" aria-labelledby="s-updates">
+      <h2 class="z-settings__h" id="s-updates">Updates</h2>
+
+      <div class="z-field z-field--row">
+        <label>
+          <span>Version</span>
+          <small id="version-detail">loading…</small>
+        </label>
+        <button class="z-btn" type="button" id="check-update">Check for updates</button>
+      </div>
+
+      <div id="update-result" class="z-update" hidden></div>
+
+      <div class="z-field z-field--row">
+        <label for="set-auto-update-check">
+          <span>Check automatically</span>
+          <small>
+            Once a day, on load. The check runs on the server and asks
+            <code>registry.npmjs.org</code> for a version number only — your browser
+            never contacts it, so nothing about your searches leaves this machine.
+          </small>
+        </label>
+        <label class="z-switch">
+          <input type="checkbox" id="set-auto-update-check" ${s.autoUpdateCheck ? 'checked' : ''}>
+          <span></span>
+        </label>
+      </div>
+    </section>
   `;
   mount.appendChild(wrap);
 
@@ -144,6 +181,7 @@ export function renderSettings(mount: HTMLElement): () => void {
       openrouterModel: pick('#set-or-model', '#set-or-custom', s.openrouterModel),
       openrouterKey: $<HTMLInputElement>('#set-or-key').value.trim(),
       adminKey: $<HTMLInputElement>('#set-admin-key').value.trim(),
+      autoUpdateCheck: $<HTMLInputElement>('#set-auto-update-check').checked,
     });
     applyTheme(next.theme);
     return next;
@@ -200,6 +238,7 @@ export function renderSettings(mount: HTMLElement): () => void {
     '#set-or-custom',
     '#set-or-key',
     '#set-admin-key',
+    '#set-auto-update-check',
   ]) {
     const node = wrap.querySelector(sel)!;
     node.addEventListener('change', onChange);
@@ -214,6 +253,7 @@ export function renderSettings(mount: HTMLElement): () => void {
   });
 
   void fillModelDropdowns(wrap, s);
+  void setupUpdates(wrap, s);
 
   return () => wrap.remove();
 }
@@ -274,6 +314,81 @@ async function fillModelDropdowns(wrap: HTMLElement, s: ZwepSettings): Promise<v
       orStatus.textContent = models.length
         ? `${models.length} available`
         : 'OpenRouter not reachable — showing presets';
+    }
+  }
+}
+
+/**
+ * Wire the Updates section: show the running version, and check npm on demand
+ * (or once a day, if the user left the automatic check on).
+ */
+async function setupUpdates(wrap: HTMLElement, s: ZwepSettings): Promise<void> {
+  const detail = wrap.querySelector<HTMLElement>('#version-detail');
+  const button = wrap.querySelector<HTMLButtonElement>('#check-update');
+  const result = wrap.querySelector<HTMLElement>('#update-result');
+  if (!detail || !button || !result) return;
+
+  try {
+    const v = await version();
+    detail.textContent = `Zwep ${v.version} · Node ${v.node} · ${v.platform}`;
+  } catch {
+    detail.textContent = 'Server not reachable';
+    button.disabled = true;
+    return;
+  }
+
+  const render = (r: UpdateStatus) => {
+    result.hidden = false;
+    if (r.error) {
+      result.className = 'z-update is-warn';
+      result.innerHTML = `Could not reach the npm registry — ${escapeHtml(r.error)}`;
+      return;
+    }
+    if (!r.updateAvailable) {
+      result.className = 'z-update is-ok';
+      result.innerHTML = `You are on the latest release (${escapeHtml(r.current)}).`;
+      return;
+    }
+    result.className = 'z-update is-update';
+    // Two artefacts, two commands: the npm client and the engine checkout
+    // update independently, and telling someone only about one is how you get
+    // a CLI that no longer matches its server.
+    result.innerHTML = `
+      <strong>Version ${escapeHtml(r.latest ?? '')} is available</strong>
+      <span>You are running ${escapeHtml(r.current)}.</span>
+      <ul>
+        <li>Command line: <code>npm install -g zwep@latest</code></li>
+        <li>This server: <code>git pull &amp;&amp; npm install</code> in your checkout, then restart</li>
+      </ul>
+      <a href="https://github.com/philppplik/zwep/releases" target="_blank" rel="noopener noreferrer">
+        Release notes ↗
+      </a>`;
+  };
+
+  button.addEventListener('click', async () => {
+    button.disabled = true;
+    const previous = button.textContent;
+    button.textContent = 'Checking…';
+    try {
+      render(await checkUpdate(true));
+    } catch (e) {
+      result.hidden = false;
+      result.className = 'z-update is-warn';
+      result.textContent = (e as Error).message;
+    } finally {
+      button.disabled = false;
+      button.textContent = previous;
+    }
+  });
+
+  // The automatic check reuses the server's one-hour cache, so opening Settings
+  // repeatedly does not mean repeatedly hitting the registry.
+  if (s.autoUpdateCheck) {
+    try {
+      const r = await checkUpdate(false);
+      if (r.updateAvailable) render(r);
+    } catch {
+      /* silent: an update check must never be the reason a screen looks broken */
     }
   }
 }

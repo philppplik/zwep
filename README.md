@@ -102,6 +102,24 @@ export ZWEP_API=http://127.0.0.1:8080     # the default
 zwep status
 ```
 
+**You usually do not need to start anything yourself.** If a command needs the
+API and a Zwep is installed but not running, the CLI starts it in the background
+and waits for it:
+
+```console
+$ zwep search "climate policy"
+› Zwep is not running. Starting it from /home/you/zwep…
+✓ Zwep is up. Run `zwep down` to stop it.
+
+12 results for "climate policy" · 8 ms
+…
+```
+
+Use `zwep up` / `zwep down` to control it explicitly, and `--no-auto-start` (or
+`ZWEP_NO_AUTOSTART=1`) to turn the behaviour off. Auto-start never fires when
+`ZWEP_API` points at a remote host — starting a local server would search a
+different index than you asked for.
+
 ### 2. The search engine itself — from source
 
 This is the crawler, indexer, API and web UI. It needs
@@ -244,8 +262,13 @@ SEARCH
   graph <term>          Knowledge-graph neighbourhood
   repl                  Interactive search session
 
-INDEX  (needs ZWEP_ADMIN_KEY)
+SERVER
+  up [--web]            Start a local Zwep in the background
+  down                  Stop the Zwep this CLI started
   status                Index health and counts
+  update                Check for a newer release
+
+INDEX  (needs ZWEP_ADMIN_KEY)
   sources list          List curated sources
   sources add <name> --seed <url>[,<url>] [--domain d] [--max-pages N]
   sources enable|disable|rm <name>
@@ -257,6 +280,22 @@ AGENTS
   mcp [--allow-write]   Run as an MCP server on stdio
   --json                Machine-readable output for any command
 ```
+
+### Staying up to date
+
+```bash
+zwep update                  # check, and print the right command for your install
+npm install -g zwep@latest   # the CLI
+```
+
+The engine updates separately — `git pull && npm install` in your checkout.
+Settings → Updates shows both, and the web UI surfaces a notice when a release
+is out.
+
+The check asks `registry.npmjs.org` for a version number and nothing else. It is
+made by the **server**, never the browser, so the registry never sees a referrer
+carrying your search. It runs at most once a day, and
+`ZWEP_NO_UPDATE_CHECK=1` (or the toggle in Settings) switches it off entirely.
 
 ### Plain HTTP
 
