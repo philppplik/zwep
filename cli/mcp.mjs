@@ -23,9 +23,10 @@
 import process from 'node:process';
 import { createInterface } from 'node:readline';
 import { ZwepClient, ZwepApiError } from './api.mjs';
+import { VERSION } from './version.mjs';
 
 const PROTOCOL_VERSION = '2024-11-05';
-const SERVER_INFO = { name: 'zwep', version: '0.2.0' };
+const SERVER_INFO = { name: 'zwep', version: VERSION };
 
 const READ_TOOLS = [
   {

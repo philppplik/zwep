@@ -1,6 +1,6 @@
 {
   "name": "zwep",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Command line and MCP server for Zwep — a small, self-hosted search engine over the sources you curate.",
   "license": "MIT",
   "author": "Philipp Paulik (https://github.com/philppplik)",
