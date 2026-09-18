@@ -160,7 +160,7 @@ export function extract(page: CrawlPage, source: string): Document | null {
     return null;
   }
 
-  let parsed: ReturnType<Readability['parse']> = null;
+  let parsed: ReturnType<Readability['parse']>;
   try {
     // Readability mutates the DOM, so it gets its own copy.
     parsed = new Readability(createDom(page.content, page.canonical_url)).parse();
