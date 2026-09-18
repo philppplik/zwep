@@ -158,7 +158,7 @@ export class Crawler {
     }
     await this.politeWait(url);
 
-    let html = '';
+    let html: string;
     let rendered = false;
     try {
       const res = await fetch(url, {

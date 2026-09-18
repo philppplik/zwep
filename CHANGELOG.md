@@ -7,6 +7,25 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Changed
+
+- Upgraded the whole dependency tree: eslint 9 to 10, TypeScript 5.9 to 6,
+  Vite 6 to 8, zod 3 to 4, js-yaml 4 to 5, @fastify/cors 10 to 11,
+  meilisearch 0.45 to 0.62, @types/node 22 to 26, globals 15 to 17,
+  playwright 1.61 to 1.63, and the GitHub Actions to v7.
+  - meilisearch renamed its client class and replaced `index.waitForTask()`
+    with a chained `.waitTask()` on the returned enqueued-task promise.
+  - js-yaml dropped its default export; the named `load` is imported instead,
+    and `@types/js-yaml` is gone since the package now ships its own types.
+  - TypeScript is held at 6 rather than 7, because typescript-eslint still caps
+    its peer at `<6.1.0`.
+
+### Fixed
+
+- Two dead initializations in the crawler and extractor, surfaced by eslint 10's
+  `no-useless-assignment`: both variables were assigned a value that every path
+  overwrote before reading.
+
 ## [0.2.0] — 2026-09-18
 
 The first release with a test suite, CI, and a command line. Most of this entry

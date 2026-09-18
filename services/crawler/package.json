@@ -9,8 +9,8 @@
   "dependencies": {
     "@zwep/config": "*",
     "@zwep/shared": "*",
-    "playwright": "^1.49.0",
-    "robots-parser": "^3.0.1",
-    "p-limit": "^6.1.0"
+    "p-limit": "^6.1.0",
+    "playwright": "^1.63.0",
+    "robots-parser": "^3.0.1"
   }
 }
