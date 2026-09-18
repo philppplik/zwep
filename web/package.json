@@ -12,7 +12,7 @@
     "@zwep/shared": "*"
   },
   "devDependencies": {
-    "typescript": "^5.7.2",
-    "vite": "^6.3.6"
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0"
   }
 }
