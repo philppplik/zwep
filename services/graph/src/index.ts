@@ -272,12 +272,21 @@ export class KnowledgeGraph {
   }
 }
 
+/**
+ * Turn an entity label into a stable id.
+ *
+ * The input is crawled page text, so it is attacker-influenced. `/^_+|_+$/`
+ * over a long run of separators backtracks polynomially, which makes a page of
+ * punctuation a cheap way to stall a crawl. Trimming the separator with
+ * explicit index arithmetic is linear and does the same job.
+ */
 function slug(s: string): string {
-  return s
-    .toLowerCase()
-    .replace(/[^a-z0-9äöüß]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .slice(0, 64);
+  const collapsed = s.toLowerCase().replace(/[^a-z0-9äöüß]+/g, '_');
+  let start = 0;
+  let end = collapsed.length;
+  while (start < end && collapsed[start] === '_') start++;
+  while (end > start && collapsed[end - 1] === '_') end--;
+  return collapsed.slice(start, end).slice(0, 64);
 }
 
 /**

@@ -86,6 +86,26 @@ export function dataDir(): string {
   return dir;
 }
 
+/**
+ * Flatten an untrusted value into a single, bounded log line.
+ *
+ * Crawled pages and third-party provider errors reach the log verbatim. A
+ * message containing a newline would let that content forge additional log
+ * entries, so line separators and other control characters are removed and the
+ * result is truncated.
+ */
+export function oneLine(value: unknown, max = 300): string {
+  let flat = '';
+  for (const ch of String(value ?? '')) {
+    const code = ch.codePointAt(0) ?? 0;
+    // Strip C0/C1 controls, DEL, and the Unicode line/paragraph separators.
+    const isControl = code < 0x20 || code === 0x7f || (code >= 0x80 && code <= 0x9f);
+    const isSeparator = code === 0x2028 || code === 0x2029;
+    flat += isControl || isSeparator ? ' ' : ch;
+  }
+  return flat.replace(/  +/g, ' ').trim().slice(0, max);
+}
+
 // ---------------------------------------------------------------------------
 // Sources
 // ---------------------------------------------------------------------------

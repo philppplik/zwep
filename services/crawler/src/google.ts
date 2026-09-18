@@ -55,12 +55,20 @@ function parseGoogleResults(html: string): string[] {
   return out;
 }
 
-function isGoogleOwned(link: string): boolean {
+const GOOGLE_DOMAINS = ['google.com', 'gstatic.com', 'googleusercontent.com'];
+
+/**
+ * True when a link points at Google's own infrastructure rather than an
+ * organic result.
+ *
+ * Matches the registrable domain or a subdomain of it, never a bare suffix:
+ * `endsWith('google.com')` also matches `evilgoogle.com`, so a host that merely
+ * *ends* with the string would have been misclassified as Google's.
+ */
+export function isGoogleOwned(link: string): boolean {
   try {
-    const h = new URL(link).hostname.replace(/^www\./, '');
-    return (
-      h.endsWith('google.com') || h.endsWith('gstatic.com') || h.endsWith('googleusercontent.com')
-    );
+    const host = new URL(link).hostname.toLowerCase().replace(/\.$/, '');
+    return GOOGLE_DOMAINS.some((d) => host === d || host.endsWith(`.${d}`));
   } catch {
     return false;
   }

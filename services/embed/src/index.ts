@@ -1,4 +1,4 @@
-import { loadEnv } from '@zwep/config';
+import { loadEnv, oneLine } from '@zwep/config';
 
 /**
  * Embedding provider abstraction for semantic search (Phase B).
@@ -136,7 +136,7 @@ export async function getEmbedProvider(): Promise<EmbedProvider | null> {
   } catch (e) {
     disabledUntil = Date.now() + RETRY_AFTER_MS;
     console.warn(
-      `[embed] provider '${env.EMBED_PROVIDER}' unavailable: ${(e as Error).message}. ` +
+      `[embed] provider '${env.EMBED_PROVIDER}' unavailable: ${oneLine((e as Error).message)}. ` +
         `Semantic search paused for ${RETRY_AFTER_MS / 1000}s.`,
     );
     return null;
