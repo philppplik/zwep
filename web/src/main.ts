@@ -372,9 +372,14 @@ stats()
       `<strong>${s.indexed.toLocaleString()}</strong> documents · ` +
       `<strong>${s.sourcesEnabled}</strong> of ${s.sources} sources active`;
   })
-  .catch(() => {
+  .catch((e) => {
     const tag = footer.querySelector('#z-footer-tag');
-    if (tag) {
-      tag.innerHTML = `<span class="z-footer__warn">API offline</span> — run <code>${escapeHtml('npm run dev')}</code>`;
-    }
+    if (!tag) return;
+    // "API offline" and "the API is up but Meilisearch is not" need different
+    // commands to fix, so they must not share a message.
+    const indexDown = e instanceof ApiError && e.code === 'index_unavailable';
+    const [label, hint] = indexDown
+      ? ['Index unavailable', 'npm run infra:up']
+      : ['API offline', 'npm run dev'];
+    tag.innerHTML = `<span class="z-footer__warn">${label}</span> — run <code>${escapeHtml(hint)}</code>`;
   });

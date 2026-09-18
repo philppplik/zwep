@@ -7,6 +7,23 @@
  */
 
 /* ===========================================================================
+   Base
+   =========================================================================== */
+
+/*
+ * Make the `hidden` attribute win.
+ *
+ * The user-agent stylesheet only sets `[hidden] { display: none }`, which any
+ * author rule with a `display` beats on specificity. Several components here
+ * set `display: grid`/`flex` on an element that is toggled with `hidden` — the
+ * search bar's clear button stayed visible on an empty input for exactly this
+ * reason. One rule fixes the whole class of bug.
+ */
+[hidden] {
+  display: none !important;
+}
+
+/* ===========================================================================
    Layout shell
    =========================================================================== */
 
@@ -1232,10 +1249,21 @@
   font-weight: 400;
 }
 
+/*
+ * The actions cell stays a real table cell.
+ *
+ * `display: flex` here takes the `<td>` out of the table's layout, so the
+ * column loses its width and the row's bottom border stops short of it — which
+ * is what made the buttons look like they were floating beside the table. The
+ * buttons are spaced inline instead.
+ */
 .z-table__actions {
-  display: flex;
-  gap: var(--z-space-1);
-  justify-content: flex-end;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.z-table__actions .z-btn + .z-btn {
+  margin-left: var(--z-space-1);
 }
 
 /* --- Toast ----------------------------------------------------------------- */
@@ -1338,7 +1366,14 @@
   gap: var(--z-space-4);
 }
 
-.z-field--row > label {
+/*
+ * The descriptive label takes the free space; the control keeps its own size.
+ *
+ * `:not(.z-switch)` is load-bearing: a switch is also a `<label>`, and
+ * `.z-field--row > label` out-specifies `.z-switch`, so without the exclusion
+ * every toggle stretched to fill the row.
+ */
+.z-field--row > label:not(.z-switch) {
   flex: 1;
   min-width: 0;
 }
@@ -1670,11 +1705,11 @@ textarea {
   .z-table__num,
   .z-table__actions {
     text-align: left;
-    justify-content: flex-start;
   }
 
   .z-table__actions {
     margin-top: var(--z-space-2);
+    white-space: normal;
   }
 
   .z-field__grid {
