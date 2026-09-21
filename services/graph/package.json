@@ -6,6 +6,6 @@
   "main": "src/index.ts",
   "dependencies": {
     "@zwep/config": "*",
-    "better-sqlite3": "^11.8.0"
+    "better-sqlite3": "^13.0.3"
   }
 }
