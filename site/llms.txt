@@ -1,0 +1,20 @@
+# Zwep
+
+> Eine selbst gehostete Suchmaschine für Quellen, denen du vertraust. Du wählst die Seiten. Zwep crawlt, indexiert und macht sie durchsuchbar. Im Browser, im Terminal und für KI-Agenten.
+
+- [Project](https://zwep.philipp-paulik.de/)
+- [Source](https://github.com/philppplik/zwep)
+- [Documentation](https://github.com/philppplik/zwep#documentation)
+- [Privacy](https://zwep.philipp-paulik.de/datenschutz)
+
+Was ist Zwep?
+Zwep ist eine MIT-lizenzierte, selbst gehostete Suchmaschine für einen kuratierten Satz von Websites. Es ist keine allgemeine Websuchmaschine.
+
+Was brauche ich zum Start?
+Für den Suchserver Node.js 22.6+ und Meilisearch. Docker ist optional. Die CLI und der MCP-Server sind separat über npm install -g zwep installierbar und verbinden sich mit einer Zwep-API.
+
+Kann ich Zwep mit KI-Agenten nutzen?
+Ja. Der MCP-Server gibt Agenten Zugriff auf deine kuratierte Suche. Die Auswahl der Quellen ersetzt keine Prüfung einzelner Ergebnisse.
+
+Ist die Projektseite eine laufende Suchmaschine?
+Nein. Diese Seite erklärt das Projekt. Den Suchserver betreibst du auf deinem eigenen Gerät oder Server.
