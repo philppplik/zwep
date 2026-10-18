@@ -15,6 +15,7 @@ describe('scoreDocument', () => {
   });
 
   it('composes the score from the documented weights', () => {
+    setQualityClock(() => FIXED_NOW);
     const q = scoreDocument({
       content: 'x'.repeat(1500),
       title: 'A clear, descriptive article title',
