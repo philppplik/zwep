@@ -18,3 +18,5 @@ Ja. Der MCP-Server gibt Agenten Zugriff auf deine kuratierte Suche. Die Auswahl 
 
 Ist die Projektseite eine laufende Suchmaschine?
 Nein. Diese Seite erklärt das Projekt. Den Suchserver betreibst du auf deinem eigenen Gerät oder Server.
+
+- Autor / author: Philipp Paulik, https://zwep.philipp-paulik.de/entwickler/philipp-paulik/
