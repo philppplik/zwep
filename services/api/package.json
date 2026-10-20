@@ -7,13 +7,13 @@
     "start": "node --experimental-strip-types src/server.ts"
   },
   "dependencies": {
-    "@fastify/cors": "^11.3.0",
+    "@fastify/cors": "^11.3.1",
     "@zwep/config": "*",
     "@zwep/graph": "*",
     "@zwep/indexer": "*",
     "@zwep/llm": "*",
     "@zwep/shared": "*",
     "@zwep/worker": "*",
-    "fastify": "^5.2.0"
+    "fastify": "^5.12.7"
   }
 }
